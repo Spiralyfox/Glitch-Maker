@@ -1,0 +1,12 @@
+{
+  "en": {
+    "name": "Shuffle",
+    "short": "Cuts audio into slices and rearranges them",
+    "detail": "Splits audio into equal pieces and shuffles the order randomly. Great for instant beat-rearrangement."
+  },
+  "fr": {
+    "name": "Shuffle",
+    "short": "Coupe l'audio en tranches et les réarrange",
+    "detail": "Découpe l'audio en morceaux égaux et mélange l'ordre aléatoirement. Parfait pour le beat-rearrangement."
+  }
+}

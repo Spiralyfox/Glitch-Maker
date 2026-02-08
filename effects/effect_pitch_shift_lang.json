@@ -1,0 +1,12 @@
+{
+  "en": {
+    "name": "Pitch Shift",
+    "short": "Changes pitch without changing speed",
+    "detail": "Transposes audio up or down in semitones. +12 = one octave up, -12 = one octave down. Simple mode is faster but lower quality."
+  },
+  "fr": {
+    "name": "Pitch Shift",
+    "short": "Change la hauteur sans changer la vitesse",
+    "detail": "Transpose l'audio en demi-tons. +12 = une octave plus haut, -12 = une octave plus bas. Le mode simple est plus rapide mais moins précis."
+  }
+}

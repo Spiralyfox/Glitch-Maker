@@ -1,0 +1,12 @@
+{
+  "en": {
+    "name": "Distortion",
+    "short": "Aggressive waveshaping crunch",
+    "detail": "Pushes audio through different clipping algorithms. Tube is warm, Fuzz aggressive, Digital harsh, Scream extreme."
+  },
+  "fr": {
+    "name": "Distortion",
+    "short": "Crunch agressif par waveshaping",
+    "detail": "Pousse l'audio à travers différents algorithmes de clipping. Tube est chaud, Fuzz agressif, Digital harsh, Scream extrême."
+  }
+}

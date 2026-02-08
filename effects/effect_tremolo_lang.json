@@ -1,0 +1,12 @@
+{
+  "en": {
+    "name": "Tremolo",
+    "short": "Rhythmic volume wobble",
+    "detail": "Modulates volume up and down at a set rate. Different shapes create different rhythmic patterns."
+  },
+  "fr": {
+    "name": "Tremolo",
+    "short": "Oscillation rythmique du volume",
+    "detail": "Module le volume de haut en bas à un rythme défini. Différentes formes créent différents patterns rythmiques."
+  }
+}

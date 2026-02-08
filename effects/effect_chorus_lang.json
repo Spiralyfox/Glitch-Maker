@@ -1,0 +1,12 @@
+{
+  "en": {
+    "name": "Chorus",
+    "short": "Thickens sound with detuned copies",
+    "detail": "Doubles the signal with slight pitch and time variations. More voices = thicker. Classic for a wide, lush sound."
+  },
+  "fr": {
+    "name": "Chorus",
+    "short": "Épaissit le son avec des copies désaccordées",
+    "detail": "Double le signal avec de légères variations de pitch et timing. Plus de voix = plus épais."
+  }
+}

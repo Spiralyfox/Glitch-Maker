@@ -1,0 +1,12 @@
+{
+  "en": {
+    "name": "Granular",
+    "short": "Chops audio into tiny grains and rearranges them",
+    "detail": "Slices audio into micro-fragments and shuffles them. Chaos controls rearrangement, density controls overlap."
+  },
+  "fr": {
+    "name": "Granular",
+    "short": "Découpe l'audio en micro-grains et les réarrange",
+    "detail": "Tranche l'audio en micro-fragments et les mélange. Le chaos contrôle le réarrangement, la densité l'overlap."
+  }
+}

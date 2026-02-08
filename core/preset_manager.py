@@ -161,3 +161,65 @@ class PresetManager:
 
     def is_builtin_tag(self, tag: str) -> bool:
         return tag in self._builtin_tags and tag not in self._deleted_tags
+
+    # ── Export / Import (.pspi) ──
+
+    def export_presets(self, filepath: str, preset_names: list[str] | None = None):
+        """Export presets to .pspi file. If names is None, export all user presets."""
+        all_p = self.get_all_presets()
+        if preset_names:
+            presets = [p for p in all_p if p["name"] in preset_names]
+        else:
+            presets = list(self._user) if self._user else all_p
+
+        # Collect tags used by exported presets
+        tags = sorted({t for p in presets for t in p.get("tags", [])})
+
+        data = {
+            "format": "glitchmaker_presets",
+            "version": 1,
+            "tags": tags,
+            "presets": presets,
+        }
+        with open(filepath, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+
+    def import_presets(self, filepath: str) -> tuple[int, list[str]]:
+        """Import presets from .pspi file. Returns (count_imported, skipped_names)."""
+        with open(filepath, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        if data.get("format") != "glitchmaker_presets":
+            raise ValueError("Invalid preset file format")
+
+        imported = 0
+        skipped = []
+        existing = {p["name"] for p in self.get_all_presets()}
+
+        # Import tags
+        for tag in data.get("tags", []):
+            if tag and tag not in self.get_all_tags():
+                self.add_tag(tag)
+
+        # Import presets
+        for p in data.get("presets", []):
+            name = p.get("name", "")
+            if not name:
+                continue
+            if name in existing:
+                skipped.append(name)
+                continue
+            self._user.append({
+                "name": name,
+                "description": p.get("description", ""),
+                "tags": p.get("tags", []),
+                "effects": p.get("effects", []),
+                "builtin": False,
+            })
+            existing.add(name)
+            imported += 1
+
+        if imported > 0:
+            self._save_user()
+
+        return imported, skipped

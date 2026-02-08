@@ -1,16 +1,15 @@
 """
-Main window — Glitch Maker v2.1
-21 effects alphabetical, separate audio/language settings, tooltips,
-volume effect, improved FFmpeg detection.
+Main window — Glitch Maker v2.2
+Plugin-based effects, global effects system, blue anchor cursor.
 """
 
 import os
 import numpy as np
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-    QFileDialog, QMessageBox, QPushButton, QLabel
+    QFileDialog, QMessageBox, QPushButton, QLabel, QApplication
 )
-from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtCore import Qt, QTimer, QThread, pyqtSignal as Signal
 from PyQt6.QtGui import QAction, QDragEnterEvent, QDropEvent, QShortcut, QKeySequence
 
 from gui.waveform_widget import WaveformWidget
@@ -21,45 +20,18 @@ from gui.dialogs import RecordDialog, AboutDialog
 from gui.catalog_dialog import CatalogDialog
 from gui.settings_dialog import SettingsDialog
 from gui.preset_dialog import PresetCreateDialog, PresetManageDialog, TagManageDialog
-from gui.effect_dialogs import (
-    StutterDialog, BitcrusherDialog, SaturationDialog,
-    PitchShiftDialog, TimeStretchDialog, ReverseDialog,
-    GranularDialog, TapeStopDialog, BufferFreezeDialog,
-    DelayDialog, RingModDialog, FilterDialog,
-    OTTDialog, VinylDialog, DatamoshDialog, ShuffleDialog,
-    VolumeDialog, ChorusDialog, DistortionDialog,
-    PhaserDialog, TremoloDialog
-)
+
 from core.audio_engine import (
-    load_audio, export_audio, ensure_stereo, get_duration, format_time
+    load_audio, export_audio, ensure_stereo, get_duration, format_time,
+    ffmpeg_status
 )
 from core.playback import PlaybackEngine
 from core.timeline import Timeline, AudioClip
 from core.project import save_project, load_project
 from core.preset_manager import PresetManager
-
-from core.effects.stutter import stutter
-from core.effects.bitcrusher import bitcrush
-from core.effects.saturation import hard_clip, soft_clip, overdrive
-from core.effects.reverse import reverse
-from core.effects.pitch_shift import pitch_shift, pitch_shift_simple
-from core.effects.time_stretch import time_stretch
-from core.effects.granular import granular
-from core.effects.tape_stop import tape_stop
-from core.effects.buffer_freeze import buffer_freeze
-from core.effects.delay import delay
-from core.effects.ring_mod import ring_mod
-from core.effects.filter import resonant_filter
-from core.effects.ott import ott
-from core.effects.vinyl import vinyl
-from core.effects.datamosh import datamosh
-from core.effects.shuffle import shuffle
-from core.effects.volume import volume as volume_fx
-from core.effects.chorus import chorus
-from core.effects.distortion import distortion
-from core.effects.phaser import phaser
-from core.effects.tremolo import tremolo
 from core.effects.utils import fade_in, fade_out
+
+from plugins.loader import load_plugins
 
 from utils.config import (
     COLORS, APP_NAME, APP_VERSION, WINDOW_MIN_WIDTH, WINDOW_MIN_HEIGHT,
@@ -67,37 +39,42 @@ from utils.config import (
 )
 from utils.translator import t, set_language, get_language
 
-# Effect name -> dialog class (sorted alphabetically)
-DIALOGS = {
-    "Bitcrusher": BitcrusherDialog,
-    "Buffer Freeze": BufferFreezeDialog,
-    "Chorus": ChorusDialog,
-    "Datamosh": DatamoshDialog,
-    "Delay": DelayDialog,
-    "Distortion": DistortionDialog,
-    "Filter": FilterDialog,
-    "Granular": GranularDialog,
-    "OTT": OTTDialog,
-    "Phaser": PhaserDialog,
-    "Pitch Shift": PitchShiftDialog,
-    "Reverse": ReverseDialog,
-    "Ring Mod": RingModDialog,
-    "Saturation": SaturationDialog,
-    "Shuffle": ShuffleDialog,
-    "Stutter": StutterDialog,
-    "Tape Stop": TapeStopDialog,
-    "Time Stretch": TimeStretchDialog,
-    "Tremolo": TremoloDialog,
-    "Vinyl": VinylDialog,
-    "Volume": VolumeDialog,
-}
+
+# ═══ Background worker for heavy operations ═══
+
+class _EffectWorker(QThread):
+    """Runs effect processing off the UI thread."""
+    done = Signal(object)   # result numpy array or None
+    error = Signal(str)
+
+    def __init__(self, fn, args, kwargs, parent=None):
+        super().__init__(parent)
+        self._fn = fn
+        self._args = args
+        self._kwargs = kwargs
+
+    def run(self):
+        try:
+            result = self._fn(*self._args, **self._kwargs)
+            self.done.emit(result)
+        except Exception as ex:
+            self.error.emit(str(ex))
 
 
 class UndoState:
-    __slots__ = ("audio", "sr", "clips", "desc")
-    def __init__(self, audio, sr, clips, desc=""):
-        self.audio = audio.copy() if audio is not None else None
-        self.sr = sr; self.clips = clips; self.desc = desc
+    """Lightweight undo snapshot — stores references (not copies) since the caller
+    replaces self.audio_data rather than mutating in-place. The arrays become
+    immutable once stored here. Only clips need real copies because timeline
+    may mutate them."""
+    __slots__ = ("audio", "sr", "clips", "desc", "base_audio", "global_effects")
+    def __init__(self, audio, sr, clips, desc="", base_audio=None, global_effects=None):
+        # Store reference — caller must NOT mutate these after push
+        self.audio = audio
+        self.sr = sr
+        self.clips = clips  # list of (name, data, pos, color) — data is a reference
+        self.desc = desc
+        self.base_audio = base_audio
+        self.global_effects = dict(global_effects) if global_effects else {}
 
 
 class MainWindow(QMainWindow):
@@ -120,6 +97,14 @@ class MainWindow(QMainWindow):
         self._redo: list[UndoState] = []
         self._unsaved = False
         self.preset_manager = PresetManager()
+
+        # Global effects: non-destructive effects applied to entire audio
+        self._base_audio: np.ndarray | None = None
+        self._global_effects: dict[str, dict] = {}  # effect_id -> params
+        self._active_worker = None  # ref to prevent GC of background worker
+
+        # Load effect plugins
+        self._plugins = load_plugins()
 
         # Build UI
         self._build_ui()
@@ -226,6 +211,9 @@ class MainWindow(QMainWindow):
         self._menu_action(fm, t("menu.file.export_mp3"), "", lambda: self._export("mp3"))
         self._menu_action(fm, t("menu.file.export_flac"), "", lambda: self._export("flac"))
         fm.addSeparator()
+        self._menu_action(fm, t("menu.file.export_presets"), "", self._export_presets)
+        self._menu_action(fm, t("menu.file.import_presets"), "", self._import_presets)
+        fm.addSeparator()
         self._menu_action(fm, t("menu.file.quit"), "Ctrl+Q", self.close)
 
         # Options
@@ -234,45 +222,31 @@ class MainWindow(QMainWindow):
         self._menu_action(om, t("menu.options.language"), "", self._settings_language)
         om.addSeparator()
         self._menu_action(om, t("menu.options.select_all"), "Ctrl+A", self._select_all)
+        om.addSeparator()
+        self._menu_action(om, t("menu.options.import_effect"), "", self._import_effect)
+        om.addSeparator()
+        self._menu_action(om, t("menu.options.ffmpeg_browse"), "", self._browse_ffmpeg)
 
-        # Effects (grouped by category)
+        # Effects (dynamically built from plugins)
         efm = mb.addMenu(t("menu.effects"))
-
-        # Basics
-        for n in ["Reverse", "Volume", "Filter"]:
-            self._menu_action(efm, n, "", lambda _, n=n: self._on_effect(n))
+        from plugins.loader import plugins_grouped
+        lang = get_language()
+        grouped = plugins_grouped(self._plugins, lang)
+        for i, (sec_label, sec_plugins) in enumerate(grouped):
+            if i > 0:
+                efm.addSeparator()
+            for plugin in sec_plugins:
+                name = plugin.get_name(lang)
+                pid = plugin.id
+                self._menu_action(efm, name, "", lambda _, pid=pid: self._on_effect(pid))
         efm.addSeparator()
-
-        # Pitch & Time
-        for n in ["Pitch Shift", "Time Stretch", "Tape Stop"]:
-            self._menu_action(efm, n, "", lambda _, n=n: self._on_effect(n))
-        efm.addSeparator()
-
-        # Distortion
-        for n in ["Saturation", "Distortion", "Bitcrusher"]:
-            self._menu_action(efm, n, "", lambda _, n=n: self._on_effect(n))
-        efm.addSeparator()
-
-        # Modulation
-        for n in ["Chorus", "Phaser", "Tremolo", "Ring Mod"]:
-            self._menu_action(efm, n, "", lambda _, n=n: self._on_effect(n))
-        efm.addSeparator()
-
-        # Space & Texture
-        for n in ["Delay", "Vinyl", "OTT"]:
-            self._menu_action(efm, n, "", lambda _, n=n: self._on_effect(n))
-        efm.addSeparator()
-
-        # Glitch
-        for n in ["Stutter", "Granular", "Shuffle", "Buffer Freeze", "Datamosh"]:
-            self._menu_action(efm, n, "", lambda _, n=n: self._on_effect(n))
-        efm.addSeparator()
-
         self._menu_action(efm, t("menu.effects.catalog"), "", self._catalog)
+        self._menu_action(efm, t("menu.options.import_effect"), "", self._import_effect)
 
         # Help
         hm = mb.addMenu(t("menu.help"))
         self._menu_action(hm, t("menu.help.about"), "", lambda: AboutDialog(self).exec())
+        self._menu_action(hm, "FFmpeg Status", "", self._show_ffmpeg_status)
 
     def _menu_action(self, menu, text, shortcut, slot) -> QAction:
         a = menu.addAction(text)
@@ -294,13 +268,15 @@ class MainWindow(QMainWindow):
 
     def _connect(self):
         self.transport.play_clicked.connect(self._play)
-        self.transport.pause_clicked.connect(self._pause)
+        self.transport.pause_clicked.connect(self._stop)
         self.transport.stop_clicked.connect(self._stop)
         self.transport.volume_changed.connect(self.playback.set_volume)
         self.waveform.position_clicked.connect(self._seek)
         self.waveform.selection_changed.connect(self._on_sel)
+        self.waveform.drag_started.connect(self._on_drag_start)
         self.effects_panel.effect_clicked.connect(self._on_effect)
         self.effects_panel.catalog_clicked.connect(self._catalog)
+        self.effects_panel.import_clicked.connect(self._import_effect)
         self.effects_panel.preset_clicked.connect(self._on_preset)
         self.effects_panel.preset_new_clicked.connect(self._new_preset)
         self.effects_panel.preset_manage_clicked.connect(self._manage_presets)
@@ -311,6 +287,7 @@ class MainWindow(QMainWindow):
         self.timeline_w.fade_in_requested.connect(self._fi_clip)
         self.timeline_w.fade_out_requested.connect(self._fo_clip)
         self.timeline_w.clips_reordered.connect(self._on_reorder)
+        self.timeline_w.seek_requested.connect(self._seek_from_timeline)
 
     def _update_undo_labels(self):
         hu, hr = bool(self._undo), bool(self._redo)
@@ -327,20 +304,24 @@ class MainWindow(QMainWindow):
 
     def _toggle_play(self):
         if self.audio_data is None: return
-        (self._pause if self.playback.is_playing else self._play)()
+        if self.playback.is_playing:
+            self._stop()        # stop → return to anchor
+        else:
+            self._play()        # play from anchor
 
     def _play(self):
         if self.audio_data is None: return
         s, e = self._sel_range()
         if s is not None:
+            # Selection exists: loop it
             self.playback.set_loop(s, e, looping=True)
-            if not self.playback.is_paused:
-                self.playback.play(start_pos=s)
-            else:
-                self.playback.play()
+            self.playback.play(start_pos=s)
         else:
+            # No selection: always start from anchor (or 0)
             self.playback.set_loop(None, None, looping=False)
-            self.playback.play()
+            anchor = self.waveform._anchor
+            start = anchor if anchor is not None else 0
+            self.playback.play(start_pos=start)
         self.transport.set_playing(True)
 
     def _pause(self):
@@ -348,25 +329,70 @@ class MainWindow(QMainWindow):
 
     def _stop(self):
         self.playback.stop(); self.transport.set_playing(False)
-        self.waveform.set_playhead(0)
-        self.timeline_w.set_playhead(0, self.sample_rate)
+        # Return playhead to anchor if set, else to 0
+        anchor = self.waveform._anchor
+        pos = anchor if anchor is not None else 0
+        self.playback.seek(pos)
+        self.waveform.set_playhead(pos)
+        self.timeline_w.set_playhead(pos, self.sample_rate)
+        self.timeline_w.set_anchor(anchor)
         if self.audio_data is not None:
-            self.transport.set_time("00:00.00", format_time(get_duration(self.audio_data, self.sample_rate)))
+            self.transport.set_time(
+                format_time(pos / self.sample_rate),
+                format_time(get_duration(self.audio_data, self.sample_rate)))
 
     def _seek(self, pos):
-        self.playback.seek(pos); self.waveform.set_playhead(pos)
+        """Single click on waveform: set blue anchor, sync timeline, clear selection."""
+        # If was playing, stop (click = new anchor, not a selection)
+        was_playing = self.playback.is_playing
+        if was_playing:
+            self.playback.stop()
+            self.transport.set_playing(False)
+        self.playback.seek(pos)
+        self.waveform.set_playhead(pos)
+        self.timeline_w.set_anchor(pos)
+        self.transport.set_selection_info("")
+        self.timeline_w._selected_id = None
+        self.timeline_w.update()
+
+    def _on_drag_start(self):
+        """Mouse down on waveform — pause playback if playing."""
+        self._was_playing_before_drag = self.playback.is_playing
+        if self._was_playing_before_drag:
+            self.playback.pause()
+
+    def _seek_from_timeline(self, pos):
+        """Click/drag in timeline: set position in both waveform and timeline."""
+        self.playback.seek(pos)
+        self.waveform.set_playhead(pos)
+        self.waveform.set_anchor(pos)
+        self.waveform.selection_start = self.waveform.selection_end = None
+        self.transport.set_selection_info("")
+        if self.audio_data is not None:
+            self.transport.set_time(
+                format_time(pos / self.sample_rate),
+                format_time(get_duration(self.audio_data, self.sample_rate)))
 
     def _on_sel(self, s, e):
         dur = format_time(abs(e - s) / self.sample_rate)
         self.transport.set_selection_info(f"Sel: {dur}")
-        # Deselect any timeline clip
+        self.waveform._anchor = None
+        self.timeline_w.clear_anchor()
         self.timeline_w._selected_id = None
         self.timeline_w.update()
-        # Move playhead to selection start
         start = min(s, e)
-        self.playback.seek(start)
-        self.waveform.set_playhead(start)
-        self.timeline_w.set_playhead(start, self.sample_rate)
+        end = max(s, e)
+
+        # If was playing before the drag, resume in the new zone
+        if getattr(self, '_was_playing_before_drag', False):
+            self._was_playing_before_drag = False
+            self.playback.set_loop(start, end, looping=True)
+            self.playback.play(start_pos=start)
+            self.transport.set_playing(True)
+        else:
+            self.playback.seek(start)
+            self.waveform.set_playhead(start)
+            self.timeline_w.set_playhead(start, self.sample_rate)
 
     def _on_finished(self):
         QTimer.singleShot(0, lambda: self.transport.set_playing(False))
@@ -382,14 +408,18 @@ class MainWindow(QMainWindow):
 
     def _sel_range(self):
         s, e = self.waveform.selection_start, self.waveform.selection_end
-        if s is not None and e is not None and s != e:
+        if s is not None and e is not None and abs(s - e) > 10:
             return min(s, e), max(s, e)
         return None, None
 
     def _deselect(self):
-        self.waveform.set_selection(None, None)
-        self.waveform.set_clip_highlight(None, None)
+        """Escape key: clear selection, anchor, clip highlight, reset zoom."""
+        self.waveform.clear_all()
+        self.waveform.reset_zoom()
         self.transport.set_selection_info("")
+        self.timeline_w._selected_id = None
+        self.timeline_w.clear_anchor()
+        self.timeline_w.update()
 
     # ══════ Open ══════
 
@@ -423,6 +453,10 @@ class MainWindow(QMainWindow):
                 self.timeline.add_clip(st, sr, name=name)
                 self._rebuild_audio()
 
+            # Reset global effects
+            self._base_audio = None
+            self._global_effects.clear()
+
             self._refresh_all()
             self._undo.clear(); self._redo.clear(); self._update_undo_labels()
             self._unsaved = True
@@ -438,6 +472,8 @@ class MainWindow(QMainWindow):
             self.timeline, self.sample_rate = tl, sr
             self.current_filepath = src
             self.project_filepath = fp
+            self._base_audio = None
+            self._global_effects.clear()
             self._rebuild_audio()
             self._undo.clear(); self._redo.clear(); self._update_undo_labels()
             self._unsaved = False
@@ -515,53 +551,216 @@ class MainWindow(QMainWindow):
             if c.id == clip_id:
                 self.waveform.set_clip_highlight(c.position, c.end_position)
                 self.waveform.set_selection(c.position, c.end_position)
-                self.waveform.selection_changed.emit(c.position, c.end_position)
+                # Update transport info directly (don't emit selection_changed
+                # which would clear the timeline anchor)
+                dur = format_time(c.duration_seconds)
+                self.transport.set_selection_info(f"Sel: {dur}")
+                # Move playhead to clip start
+                self.playback.seek(c.position)
+                self.waveform.set_playhead(c.position)
+                self.timeline_w.set_playhead(c.position, self.sample_rate)
                 return
         self.waveform.set_clip_highlight(None, None)
 
-    # ══════ Effects (modify in-place) ══════
+    # ══════ Effects (plugin-based) ══════
 
-    def _on_effect(self, name):
+    def _find_plugin(self, effect_id):
+        """Find plugin by ID, or try matching by display name for preset compat."""
+        if effect_id in self._plugins:
+            return self._plugins[effect_id]
+        # Fallback: match by name for backward compat with presets
+        lang = get_language()
+        for pid, plugin in self._plugins.items():
+            if plugin.get_name("en") == effect_id or plugin.get_name("fr") == effect_id:
+                return plugin
+        return None
+
+    def _on_effect(self, effect_id):
         if self.audio_data is None:
             QMessageBox.warning(self, APP_NAME, t("error.no_audio")); return
-        dlg = DIALOGS.get(name)
-        if not dlg:
+        plugin = self._find_plugin(effect_id)
+        if not plugin:
             return
-        d = dlg(self)
+
+        # Stop main playback to avoid stream conflicts with preview
+        if self.playback.is_playing:
+            self._stop()
+
+        s, e = self._sel_range()
+        is_global = (s is None)
+
+        d = plugin.dialog_class(self)
+
+        # Inject preview context — segment + process function
+        if is_global:
+            preview_seg = self.audio_data
+        else:
+            preview_seg = self.audio_data[s:e]
+        if preview_seg is not None and len(preview_seg) > 0:
+            d.setup_preview(preview_seg, self.sample_rate, plugin.process_fn)
+
+        # If global mode and we already have stored params, pre-fill
+        if is_global and effect_id in self._global_effects:
+            try:
+                d.set_params(self._global_effects[effect_id])
+            except Exception:
+                pass
+
         if d.exec() != d.DialogCode.Accepted:
             return
-        self._push_undo(name)
-        self._apply_effect(name, d.get_params())
 
-    def _apply_effect(self, name, params):
+        params = d.get_params()
+        name = plugin.get_name(get_language())
+
+        if is_global:
+            self._push_undo(f"{name} (global)")
+            self._global_effects[effect_id] = params
+            self._run_global_effects_async()
+        else:
+            self._push_undo(name)
+            self._run_local_effect_async(effect_id, params, s, e)
+
+    def _run_plugin(self, effect_id, seg, sr, params):
+        """Run plugin's process function on a segment."""
+        plugin = self._find_plugin(effect_id)
+        if not plugin:
+            print(f"[effect] Unknown: {effect_id}")
+            return None
         try:
-            s, e = self._sel_range()
-            if s is None:
-                s, e = 0, len(self.audio_data)
-            segment = self.audio_data[s:e].copy()
-            sl = len(segment)
-            if sl == 0:
-                return
+            return plugin.process_fn(seg, 0, len(seg), sr=sr, **params)
+        except Exception as ex:
+            print(f"[effect] {effect_id} error: {ex}")
+            return None
 
-            mod = self._run_effect(name, segment, sl, self.sample_rate, params)
+    # ── Async effect processing ──
+
+    def _set_busy(self, busy):
+        """Set/restore busy cursor and disable effect interactions."""
+        if busy:
+            QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+            self.effects_panel.setEnabled(False)
+        else:
+            QApplication.restoreOverrideCursor()
+            self.effects_panel.setEnabled(True)
+
+    def _run_local_effect_async(self, effect_id, params, s, e):
+        """Run local effect in background thread."""
+        segment = self.audio_data[s:e].copy()
+        if len(segment) == 0:
+            return
+        self._set_busy(True)
+
+        def _process():
+            plugin = self._find_plugin(effect_id)
+            if not plugin:
+                return None
+            return plugin.process_fn(segment, 0, len(segment),
+                                     sr=self.sample_rate, **params)
+
+        worker = _EffectWorker(_process, (), {}, self)
+        # Store ref to prevent GC
+        self._active_worker = worker
+
+        def _on_done(mod):
+            self._set_busy(False)
+            self._active_worker = None
             if mod is None:
+                if self._undo:
+                    self._do_undo()
                 return
-            mod = mod.astype(np.float32)
-
-            before = self.audio_data[:s]
-            after = self.audio_data[e:]
-            self.audio_data = np.concatenate(
-                [p for p in [before, mod, after] if len(p) > 0], axis=0
-            ).astype(np.float32)
-
+            if mod.dtype != np.float32:
+                mod = mod.astype(np.float32)
+            # Splice result into audio
+            if len(mod) == (e - s):
+                new_audio = self.audio_data.copy()
+                new_audio[s:e] = mod
+                self.audio_data = new_audio
+            else:
+                before, after = self.audio_data[:s], self.audio_data[e:]
+                parts = [p for p in [before, mod, after] if len(p) > 0]
+                self.audio_data = np.concatenate(parts, axis=0).astype(np.float32)
+            # Also update base_audio if global chain exists
+            if self._base_audio is not None:
+                try:
+                    mod_b = self._run_plugin(effect_id, self._base_audio[s:e].copy(),
+                                             self.sample_rate, dict(params))
+                    if mod_b is not None:
+                        if mod_b.dtype != np.float32:
+                            mod_b = mod_b.astype(np.float32)
+                        if len(mod_b) == (e - s):
+                            new_base = self._base_audio.copy()
+                            new_base[s:e] = mod_b
+                            self._base_audio = new_base
+                        else:
+                            before_b, after_b = self._base_audio[:s], self._base_audio[e:]
+                            parts_b = [p for p in [before_b, mod_b, after_b] if len(p) > 0]
+                            self._base_audio = np.concatenate(parts_b, axis=0).astype(np.float32)
+                except Exception:
+                    pass
             self._update_clips_from_audio()
             self._refresh_all()
             self._unsaved = True
+            plugin = self._find_plugin(effect_id)
+            name = plugin.get_name(get_language()) if plugin else effect_id
             self.statusBar().showMessage(f"Applied: {name}")
-        except Exception as ex:
-            QMessageBox.critical(self, APP_NAME, f"{name}: {ex}")
+
+        def _on_error(msg):
+            self._set_busy(False)
+            self._active_worker = None
+            QMessageBox.critical(self, APP_NAME, f"{effect_id}: {msg}")
             if self._undo:
                 self._do_undo()
+
+        worker.done.connect(_on_done)
+        worker.error.connect(_on_error)
+        worker.start()
+
+    def _run_global_effects_async(self):
+        """Run global effect chain in background thread."""
+        if self._base_audio is None:
+            self._base_audio = self.audio_data.copy()
+        base = self._base_audio.copy()
+        sr = self.sample_rate
+        effects_list = list(self._global_effects.items())
+        self._set_busy(True)
+
+        def _process():
+            working = base
+            for eid, params in effects_list:
+                plugin = self._find_plugin(eid)
+                if not plugin:
+                    continue
+                mod = plugin.process_fn(working.copy(), 0, len(working),
+                                        sr=sr, **dict(params))
+                if mod is not None:
+                    working = mod.astype(np.float32) if mod.dtype != np.float32 else mod
+            return working
+
+        worker = _EffectWorker(_process, (), {}, self)
+        self._active_worker = worker
+
+        def _on_done(result):
+            self._set_busy(False)
+            self._active_worker = None
+            if result is not None:
+                self.audio_data = result
+                self._update_clips_from_audio()
+                self._refresh_all()
+                self._unsaved = True
+                names = ", ".join(p.get_name(get_language()) for eid in self._global_effects
+                                  if (p := self._find_plugin(eid)))
+                self.statusBar().showMessage(f"Global: {names}")
+
+        def _on_error(msg):
+            self._set_busy(False)
+            self._active_worker = None
+            QMessageBox.critical(self, APP_NAME, f"Global effect error: {msg}")
+            if self._undo:
+                self._do_undo()
+
+        worker.done.connect(_on_done)
+        worker.error.connect(_on_error)
+        worker.start()
 
     def _update_clips_from_audio(self):
         if not self.timeline.clips:
@@ -589,144 +788,6 @@ class MainWindow(QMainWindow):
             extra = ensure_stereo(self.audio_data[pos:total])
             last.audio_data = np.concatenate([last.audio_data, extra], axis=0)
 
-    def _run_effect(self, name, seg, sl, sr, p):
-        """Run an effect with param translation from dialog keys → function keys."""
-        try:
-            if name == "Stutter":
-                # Dialog: repeats, size_ms  →  Func: repeats, decay, stutter_mode
-                return stutter(seg, 0, sl,
-                               repeats=p.get("repeats", 4),
-                               decay=p.get("decay", 0.0),
-                               stutter_mode=p.get("stutter_mode", "normal"))
-
-            if name == "Bitcrusher":
-                return bitcrush(seg, 0, sl,
-                                bit_depth=p.get("bit_depth", 8),
-                                downsample=p.get("downsample", 4))
-
-            if name == "Saturation":
-                tp = p.get("type", "soft")
-                drive = p.get("drive", 3.0)
-                if tp == "hard":
-                    return hard_clip(seg, 0, sl, threshold=max(0.01, 1.0 / drive))
-                elif tp == "overdrive":
-                    return overdrive(seg, 0, sl, gain=drive, tone=0.5)
-                else:
-                    return soft_clip(seg, 0, sl, drive=drive)
-
-            if name == "Reverse":
-                return reverse(seg, 0, sl)
-
-            if name == "Pitch Shift":
-                simple = p.get("simple", False)
-                semi = p.get("semitones", 0)
-                if simple:
-                    return pitch_shift_simple(seg, 0, sl, semitones=semi)
-                return pitch_shift(seg, 0, sl, semitones=semi, sr=sr)
-
-            if name == "Time Stretch":
-                return time_stretch(seg, 0, sl, factor=p.get("factor", 1.0))
-
-            if name == "Granular":
-                # Dialog: grain_ms, density, chaos  →  Func: grain_size_ms, density, randomize
-                return granular(seg, 0, sl, sr=sr,
-                                grain_size_ms=p.get("grain_ms", p.get("grain_size_ms", 50)),
-                                density=p.get("density", 1.0),
-                                randomize=p.get("chaos", p.get("randomize", 0.5)))
-
-            if name == "Tape Stop":
-                # Dialog: duration_ms  →  Func: duration_pct
-                dur_ms = p.get("duration_ms", 1500)
-                dur_pct = p.get("duration_pct", dur_ms / 3000.0)
-                return tape_stop(seg, 0, sl, duration_pct=min(1.0, max(0.05, dur_pct)), sr=sr)
-
-            if name == "Buffer Freeze":
-                # Dialog: buffer_ms  →  Func: grain_ms, repeats
-                return buffer_freeze(seg, 0, sl, sr=sr,
-                                     grain_ms=p.get("buffer_ms", p.get("grain_ms", 80)),
-                                     repeats=p.get("repeats", 0))
-
-            if name == "Delay":
-                return delay(seg, 0, sl, sr=sr,
-                             delay_ms=p.get("delay_ms", 200),
-                             feedback=p.get("feedback", 0.6),
-                             mix=p.get("mix", 0.5))
-
-            if name == "Ring Mod":
-                # Dialog: frequency  →  Func: freq
-                return ring_mod(seg, 0, sl, sr=sr,
-                                freq=p.get("frequency", p.get("freq", 440)),
-                                mix=p.get("mix", 0.7))
-
-            if name == "Filter":
-                # Dialog: cutoff_hz  →  Func: cutoff
-                return resonant_filter(seg, 0, sl, sr=sr,
-                                       filter_type=p.get("filter_type", "lowpass"),
-                                       cutoff=p.get("cutoff_hz", p.get("cutoff", 2000)),
-                                       resonance=p.get("resonance", 1.0),
-                                       sweep=p.get("sweep", False))
-
-            if name == "OTT":
-                return ott(seg, 0, sl, sr=sr, depth=p.get("depth", 0.7))
-
-            if name == "Vinyl":
-                # Dialog: amount  →  Func: crackle, noise, wow
-                amt = p.get("amount", None)
-                if amt is not None:
-                    return vinyl(seg, 0, sl, sr=sr,
-                                 crackle=amt, noise=amt * 0.6, wow=amt * 0.4)
-                return vinyl(seg, 0, sl, sr=sr,
-                             crackle=p.get("crackle", 0.5),
-                             noise=p.get("noise", 0.3),
-                             wow=p.get("wow", 0.2))
-
-            if name == "Datamosh":
-                # Dialog: chaos  →  Func: intensity
-                return datamosh(seg, 0, sl,
-                                intensity=p.get("chaos", p.get("intensity", 0.5)),
-                                block_size=p.get("block_size", 512),
-                                mode=p.get("mode", "swap"))
-
-            if name == "Shuffle":
-                # Dialog: num_slices  →  Func: slices
-                return shuffle(seg, 0, sl,
-                               slices=p.get("num_slices", p.get("slices", 8)),
-                               mode=p.get("mode", "random"))
-
-            if name == "Volume":
-                return volume_fx(seg, 0, sl, gain_pct=p.get("gain_pct", 100))
-
-            if name == "Chorus":
-                return chorus(seg, 0, sl, sr=sr,
-                              depth_ms=p.get("depth_ms", 5),
-                              rate_hz=p.get("rate_hz", 1.5),
-                              mix=p.get("mix", 0.5),
-                              voices=p.get("voices", 2))
-
-            if name == "Distortion":
-                return distortion(seg, 0, sl,
-                                  drive=p.get("drive", 5),
-                                  tone=p.get("tone", 0.5),
-                                  mode=p.get("mode", "tube"))
-
-            if name == "Phaser":
-                return phaser(seg, 0, sl, sr=sr,
-                              rate_hz=p.get("rate_hz", 0.5),
-                              depth=p.get("depth", 0.7),
-                              stages=p.get("stages", 4),
-                              mix=p.get("mix", 0.7))
-
-            if name == "Tremolo":
-                return tremolo(seg, 0, sl, sr=sr,
-                               rate_hz=p.get("rate_hz", 5),
-                               depth=p.get("depth", 0.7),
-                               shape=p.get("shape", "sine"))
-
-        except Exception as ex:
-            print(f"[effect] {name} error: {ex}")
-            self.statusBar().showMessage(f"Error: {name}: {ex}")
-        return None
-
     # ══════ Presets ══════
 
     def _refresh_presets(self):
@@ -748,30 +809,38 @@ class MainWindow(QMainWindow):
         if not preset:
             return
         self._push_undo(f"Preset: {name}")
-        for eff in preset["effects"]:
-            try:
-                segment = self.audio_data[s:e].copy()
-                sl = len(segment)
-                if sl == 0:
+        self._set_busy(True)
+        QApplication.processEvents()
+        try:
+            for eff in preset["effects"]:
+                try:
+                    segment = self.audio_data[s:e].copy()
+                    sl = len(segment)
+                    if sl == 0:
+                        break
+                    eff_name = eff["name"]
+                    plugin = self._find_plugin(eff_name)
+                    if not plugin:
+                        self.statusBar().showMessage(f"Unknown effect: {eff_name}")
+                        continue
+                    mod = self._run_plugin(plugin.id, segment, self.sample_rate, dict(eff["params"]))
+                    if mod is not None:
+                        if mod.dtype != np.float32:
+                            mod = mod.astype(np.float32)
+                        before, after = self.audio_data[:s], self.audio_data[e:]
+                        self.audio_data = np.concatenate(
+                            [p for p in [before, mod, after] if len(p) > 0], axis=0
+                        ).astype(np.float32)
+                        e = s + len(mod)
+                except Exception as ex:
+                    self.statusBar().showMessage(f"Error {eff['name']}: {ex}")
                     break
-                eff_name = eff["name"]
-                if eff_name == "Filtre":
-                    eff_name = "Filter"
-                mod = self._run_effect(eff_name, segment, sl, self.sample_rate, dict(eff["params"]))
-                if mod is not None:
-                    mod = mod.astype(np.float32)
-                    before, after = self.audio_data[:s], self.audio_data[e:]
-                    self.audio_data = np.concatenate(
-                        [p for p in [before, mod, after] if len(p) > 0], axis=0
-                    ).astype(np.float32)
-                    e = s + len(mod)
-            except Exception as ex:
-                self.statusBar().showMessage(f"Error {eff['name']}: {ex}")
-                break
-        self._update_clips_from_audio()
-        self._refresh_all()
-        self._unsaved = True
-        self.statusBar().showMessage(f"Preset applied: {name}")
+            self._update_clips_from_audio()
+            self._refresh_all()
+            self._unsaved = True
+            self.statusBar().showMessage(f"Preset applied: {name}")
+        finally:
+            self._set_busy(False)
 
     def _new_preset(self):
         tags = self.preset_manager.get_all_tags()
@@ -786,6 +855,69 @@ class MainWindow(QMainWindow):
         dlg.exec()
         if dlg.deleted:
             self._refresh_presets()
+
+    def _export_presets(self):
+        from PyQt6.QtWidgets import QFileDialog
+        path, _ = QFileDialog.getSaveFileName(
+            self, t("menu.file.export_presets"), "",
+            "GlitchMaker Presets (*.pspi)")
+        if not path:
+            return
+        if not path.endswith(".pspi"):
+            path += ".pspi"
+        try:
+            self.preset_manager.export_presets(path)
+            count = len(self.preset_manager.get_all_presets())
+            self.statusBar().showMessage(f"Exported {count} presets → {os.path.basename(path)}")
+        except Exception as ex:
+            QMessageBox.critical(self, "Export Error", str(ex))
+
+    def _import_presets(self):
+        from PyQt6.QtWidgets import QFileDialog
+        path, _ = QFileDialog.getOpenFileName(
+            self, t("menu.file.import_presets"), "",
+            "GlitchMaker Presets (*.pspi)")
+        if not path:
+            return
+        try:
+            count, skipped = self.preset_manager.import_presets(path)
+            self._refresh_presets()
+            msg = f"Imported {count} preset(s)."
+            if skipped:
+                msg += f"\nSkipped {len(skipped)} duplicate(s): {', '.join(skipped[:5])}"
+                if len(skipped) > 5:
+                    msg += "..."
+            QMessageBox.information(self, "Import", msg)
+        except Exception as ex:
+            QMessageBox.critical(self, "Import Error", str(ex))
+
+    def _browse_ffmpeg(self):
+        from PyQt6.QtWidgets import QFileDialog
+        from core.audio_engine import _find_ffmpeg, set_ffmpeg_path
+        current = _find_ffmpeg()
+        if current:
+            reply = QMessageBox.question(
+                self, "FFmpeg",
+                f"FFmpeg already found:\n{current}\n\nBrowse for a different one?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+            if reply != QMessageBox.StandardButton.Yes:
+                return
+        if os.name == "nt":
+            filt = "ffmpeg (ffmpeg.exe)"
+        else:
+            filt = "ffmpeg (ffmpeg)"
+        path, _ = QFileDialog.getOpenFileName(self, "Locate FFmpeg", "", filt)
+        if not path:
+            return
+        try:
+            set_ffmpeg_path(path)
+            settings = load_settings()
+            settings["ffmpeg_path"] = path
+            save_settings(settings)
+            self.statusBar().showMessage(f"FFmpeg set: {path}")
+            QMessageBox.information(self, "FFmpeg", f"✅ FFmpeg configured!\n{path}")
+        except Exception as ex:
+            QMessageBox.critical(self, "FFmpeg", f"Error: {ex}")
 
     # ══════ Timeline ops ══════
 
@@ -806,10 +938,14 @@ class MainWindow(QMainWindow):
         idx = self.timeline.clips.index(clip)
         a, b = clip.audio_data[:pos].copy(), clip.audio_data[pos:].copy()
         self.timeline.clips.remove(clip)
+        # Part A keeps original color, Part B gets new distinct color
+        from core.timeline import _generate_distinct_color
+        new_color = _generate_distinct_color(self.timeline._color_counter)
+        self.timeline._color_counter += 1
         ca = AudioClip(name=f"{clip.name} (A)", audio_data=a, sample_rate=clip.sample_rate,
                        position=clip.position, color=clip.color)
         cb = AudioClip(name=f"{clip.name} (B)", audio_data=b, sample_rate=clip.sample_rate,
-                       position=clip.position + len(a), color="#16c79a")
+                       position=clip.position + len(a), color=new_color)
         self.timeline.clips.insert(idx, cb)
         self.timeline.clips.insert(idx, ca)
         self._rebuild_audio(); self._unsaved = True
@@ -866,8 +1002,12 @@ class MainWindow(QMainWindow):
     def _push_undo(self, desc):
         if self.audio_data is None:
             return
-        clips = [(c.name, c.audio_data.copy(), c.position, c.color) for c in self.timeline.clips]
-        self._undo.append(UndoState(self.audio_data, self.sample_rate, clips, desc))
+        # Snapshot clip state (references are safe — arrays get replaced, not mutated)
+        clips = [(c.name, c.audio_data, c.position, c.color) for c in self.timeline.clips]
+        self._undo.append(UndoState(
+            self.audio_data, self.sample_rate, clips, desc,
+            base_audio=self._base_audio,
+            global_effects=self._global_effects))
         if len(self._undo) > 30:
             self._undo.pop(0)
         self._redo.clear()
@@ -876,8 +1016,11 @@ class MainWindow(QMainWindow):
     def _do_undo(self):
         if not self._undo:
             return
-        cn = [(c.name, c.audio_data.copy(), c.position, c.color) for c in self.timeline.clips]
-        self._redo.append(UndoState(self.audio_data, self.sample_rate, cn, ""))
+        # Save current state to redo (references, no copies)
+        cn = [(c.name, c.audio_data, c.position, c.color) for c in self.timeline.clips]
+        self._redo.append(UndoState(
+            self.audio_data, self.sample_rate, cn, "",
+            base_audio=self._base_audio, global_effects=self._global_effects))
         self._restore(self._undo.pop())
         self.statusBar().showMessage("Undo")
         self._update_undo_labels()
@@ -885,19 +1028,24 @@ class MainWindow(QMainWindow):
     def _do_redo(self):
         if not self._redo:
             return
-        cn = [(c.name, c.audio_data.copy(), c.position, c.color) for c in self.timeline.clips]
-        self._undo.append(UndoState(self.audio_data, self.sample_rate, cn, ""))
+        cn = [(c.name, c.audio_data, c.position, c.color) for c in self.timeline.clips]
+        self._undo.append(UndoState(
+            self.audio_data, self.sample_rate, cn, "",
+            base_audio=self._base_audio, global_effects=self._global_effects))
         self._restore(self._redo.pop())
         self.statusBar().showMessage("Redo")
         self._update_undo_labels()
 
     def _restore(self, state):
         self._stop()
-        self.audio_data = state.audio.copy() if state.audio is not None else None
+        # Take ownership — no copies needed (old refs are in redo stack)
+        self.audio_data = state.audio
         self.sample_rate = state.sr
+        self._base_audio = state.base_audio
+        self._global_effects = dict(state.global_effects) if state.global_effects else {}
         self.timeline.clear()
         for name, data, pos, color in state.clips:
-            c = AudioClip(name=name, audio_data=data.copy(), sample_rate=state.sr,
+            c = AudioClip(name=name, audio_data=data, sample_rate=state.sr,
                           position=pos, color=color)
             self.timeline.clips.append(c)
         self.timeline.sample_rate = state.sr
@@ -930,6 +1078,18 @@ class MainWindow(QMainWindow):
                 self._update_undo_labels()
                 self.statusBar().showMessage(t("status.lang_changed"))
 
+    def _import_effect(self):
+        from gui.import_plugin_dialog import ImportPluginDialog
+        dlg = ImportPluginDialog(self)
+        dlg.exec()
+        if dlg.changed:
+            # Reload plugins and rebuild UI
+            from plugins.loader import load_plugins
+            self._plugins = load_plugins(force_reload=True)
+            self._build_menus()
+            self.effects_panel.reload_plugins()
+            self.statusBar().showMessage("Plugins reloaded")
+
     # ══════ Misc ══════
 
     def _record(self):
@@ -955,6 +1115,9 @@ class MainWindow(QMainWindow):
 
     def _catalog(self):
         CatalogDialog(self).exec()
+
+    def _show_ffmpeg_status(self):
+        QMessageBox.information(self, "FFmpeg Status", ffmpeg_status())
 
     # ══════ Drag & Drop ══════
 

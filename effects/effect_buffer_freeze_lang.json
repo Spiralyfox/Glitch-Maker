@@ -1,0 +1,12 @@
+{
+  "en": {
+    "name": "Buffer Freeze",
+    "short": "Freezes a tiny audio moment and repeats it",
+    "detail": "Captures a small chunk of audio and loops it endlessly. Creates stuttering drone effects."
+  },
+  "fr": {
+    "name": "Buffer Freeze",
+    "short": "Gèle un instant audio et le répète",
+    "detail": "Capture un petit morceau d'audio et le boucle sans fin. Crée des effets de drone stutter."
+  }
+}

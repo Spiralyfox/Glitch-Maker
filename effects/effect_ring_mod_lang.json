@@ -1,0 +1,12 @@
+{
+  "en": {
+    "name": "Ring Mod",
+    "short": "Multiplies signal with a sine wave for metallic tones",
+    "detail": "Ring modulation multiplies your audio by a pure tone. Creates robotic, metallic, bell-like sounds."
+  },
+  "fr": {
+    "name": "Ring Mod",
+    "short": "Multiplie le signal par une onde sinusoïdale",
+    "detail": "La modulation en anneau multiplie votre audio par un ton pur. Crée des sons robotiques, métalliques."
+  }
+}

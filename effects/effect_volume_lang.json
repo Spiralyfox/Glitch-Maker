@@ -1,0 +1,12 @@
+{
+  "en": {
+    "name": "Volume",
+    "short": "Adjusts loudness from silent to extreme boost",
+    "detail": "Simple gain control from 0% (silence) to 1000% (massive boost with clipping). Use it to normalize quiet sections or deliberately overdrive for distortion."
+  },
+  "fr": {
+    "name": "Volume",
+    "short": "Ajuste le volume de silencieux à boost extrême",
+    "detail": "Contrôle de gain simple de 0% (silence) à 1000% (boost massif avec clipping). Pour normaliser les passages calmes ou saturer volontairement."
+  }
+}

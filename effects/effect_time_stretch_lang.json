@@ -1,0 +1,12 @@
+{
+  "en": {
+    "name": "Time Stretch",
+    "short": "Speeds up or slows down without pitch change",
+    "detail": "Changes the duration of audio while keeping the original pitch. Factor > 1 = slower, < 1 = faster."
+  },
+  "fr": {
+    "name": "Time Stretch",
+    "short": "Accélère ou ralentit sans changer la hauteur",
+    "detail": "Change la durée de l'audio en gardant le pitch original. Facteur > 1 = plus lent, < 1 = plus rapide."
+  }
+}

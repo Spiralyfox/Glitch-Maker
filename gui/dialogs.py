@@ -86,7 +86,7 @@ class RecordDialog(QDialog):
 class AboutDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle(f"About {APP_NAME}"); self.setFixedSize(380, 320)
+        self.setWindowTitle(f"About {APP_NAME}"); self.setFixedSize(400, 380)
         self.setStyleSheet(f"QDialog {{ background: {COLORS['bg_medium']}; }}")
         lo = QVBoxLayout(self); lo.setSpacing(10); lo.setContentsMargins(24, 24, 24, 24)
 
@@ -100,6 +100,18 @@ class AboutDialog(QDialog):
         lo.addSpacing(6)
         d = QLabel(t("about.desc")); d.setStyleSheet(f"color: {COLORS['text']}; font-size: 11px;")
         d.setAlignment(Qt.AlignmentFlag.AlignCenter); d.setWordWrap(True); lo.addWidget(d)
+
+        lo.addSpacing(6)
+        gh_url = "https://github.com/Spiralyfox/Glitch-Maker"
+        gh = QLabel(f'<a href="{gh_url}" style="color: {COLORS["accent"]};">{gh_url}</a>')
+        gh.setOpenExternalLinks(True)
+        gh.setAlignment(Qt.AlignmentFlag.AlignCenter); gh.setWordWrap(True)
+        lo.addWidget(gh)
+
+        gh_hint = QLabel(t("about.github_hint"))
+        gh_hint.setStyleSheet(f"color: {COLORS['text_dim']}; font-size: 10px;")
+        gh_hint.setAlignment(Qt.AlignmentFlag.AlignCenter); gh_hint.setWordWrap(True)
+        lo.addWidget(gh_hint)
 
         lo.addStretch()
 

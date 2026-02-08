@@ -1,193 +1,1084 @@
 {
   "tags": [
-    "Glitch", "Vocal", "Lo-fi", "Experimental", "Dariacore",
-    "Ambient", "Aggressive", "Subtle", "Tape", "Rhythmic",
-    "Bass", "Cinematic", "Psychedelic", "Clean"
+    "Glitch",
+    "Vocal",
+    "Lo-fi",
+    "Experimental",
+    "Dariacore",
+    "Ambient",
+    "Aggressive",
+    "Subtle",
+    "Tape",
+    "Rhythmic",
+    "Bass",
+    "Cinematic",
+    "Psychedelic",
+    "Clean",
+    "Hyperpop",
+    "Digicore",
+    "Emocore",
+    "Electro",
+    "Autotune"
   ],
   "presets": [
     {
       "name": "Light Glitch",
       "description": "Subtle stutter + crunch",
-      "tags": ["Subtle", "Glitch"],
+      "tags": [
+        "Subtle",
+        "Glitch"
+      ],
       "effects": [
-        {"name": "Stutter", "params": {"repeats": 2, "size_ms": 80}},
-        {"name": "Bitcrusher", "params": {"bit_depth": 12, "downsample": 1}}
+        {
+          "name": "Stutter",
+          "params": {
+            "repeats": 2,
+            "size_ms": 80
+          }
+        },
+        {
+          "name": "Bitcrusher",
+          "params": {
+            "bit_depth": 12,
+            "downsample": 1
+          }
+        }
       ],
       "builtin": true
     },
     {
       "name": "Digicore Vocal",
       "description": "Pitched up stutter vocal",
-      "tags": ["Vocal", "Glitch"],
+      "tags": [
+        "Vocal",
+        "Glitch"
+      ],
       "effects": [
-        {"name": "Pitch Shift", "params": {"semitones": 3, "simple": true}},
-        {"name": "Stutter", "params": {"repeats": 4, "size_ms": 50}}
+        {
+          "name": "Pitch Shift",
+          "params": {
+            "semitones": 3,
+            "simple": true
+          }
+        },
+        {
+          "name": "Stutter",
+          "params": {
+            "repeats": 4,
+            "size_ms": 50
+          }
+        }
       ],
       "builtin": true
     },
     {
       "name": "100 gecs Mode",
       "description": "Extreme pitched chaos",
-      "tags": ["Aggressive", "Experimental"],
+      "tags": [
+        "Aggressive",
+        "Experimental"
+      ],
       "effects": [
-        {"name": "Saturation", "params": {"type": "hard", "drive": 8.0}},
-        {"name": "Granular", "params": {"grain_ms": 30, "density": 4, "chaos": 0.9}},
-        {"name": "Pitch Shift", "params": {"semitones": 7, "simple": true}}
+        {
+          "name": "Saturation",
+          "params": {
+            "type": "hard",
+            "drive": 8.0
+          }
+        },
+        {
+          "name": "Granular",
+          "params": {
+            "grain_ms": 30,
+            "density": 4,
+            "chaos": 0.9
+          }
+        },
+        {
+          "name": "Pitch Shift",
+          "params": {
+            "semitones": 7,
+            "simple": true
+          }
+        }
       ],
       "builtin": true
     },
     {
       "name": "Tape Wreck",
       "description": "Broken cassette vibes",
-      "tags": ["Tape", "Lo-fi"],
+      "tags": [
+        "Tape",
+        "Lo-fi"
+      ],
       "effects": [
-        {"name": "Tape Stop", "params": {"duration_ms": 1500}},
-        {"name": "Reverse", "params": {}},
-        {"name": "Vinyl", "params": {"amount": 0.6}}
+        {
+          "name": "Tape Stop",
+          "params": {
+            "duration_ms": 1500
+          }
+        },
+        {
+          "name": "Reverse",
+          "params": {}
+        },
+        {
+          "name": "Vinyl",
+          "params": {
+            "amount": 0.6
+          }
+        }
       ],
       "builtin": true
     },
     {
       "name": "Dariacore Chop",
       "description": "Hyperpop slice & dice",
-      "tags": ["Dariacore", "Rhythmic"],
+      "tags": [
+        "Dariacore",
+        "Rhythmic"
+      ],
       "effects": [
-        {"name": "Shuffle", "params": {"num_slices": 16}},
-        {"name": "Time Stretch", "params": {"factor": 1.3}}
+        {
+          "name": "Shuffle",
+          "params": {
+            "num_slices": 16
+          }
+        },
+        {
+          "name": "Time Stretch",
+          "params": {
+            "factor": 1.3
+          }
+        }
       ],
       "builtin": true
     },
     {
       "name": "Underwater",
       "description": "Deep muffled ambience",
-      "tags": ["Ambient", "Experimental"],
+      "tags": [
+        "Ambient",
+        "Experimental"
+      ],
       "effects": [
-        {"name": "Filter", "params": {"filter_type": "lowpass", "cutoff_hz": 400, "resonance": 3.0}},
-        {"name": "Delay", "params": {"delay_ms": 350, "feedback": 0.5, "mix": 0.4}}
+        {
+          "name": "Filter",
+          "params": {
+            "filter_type": "lowpass",
+            "cutoff_hz": 400,
+            "resonance": 3.0
+          }
+        },
+        {
+          "name": "Delay",
+          "params": {
+            "delay_ms": 350,
+            "feedback": 0.5,
+            "mix": 0.4
+          }
+        }
       ],
       "builtin": true
     },
     {
       "name": "Robot Voice",
       "description": "Metallic ring modulation",
-      "tags": ["Vocal", "Experimental"],
+      "tags": [
+        "Vocal",
+        "Experimental"
+      ],
       "effects": [
-        {"name": "Ring Mod", "params": {"frequency": 280, "mix": 0.7}},
-        {"name": "Bitcrusher", "params": {"bit_depth": 6, "downsample": 2}}
+        {
+          "name": "Ring Mod",
+          "params": {
+            "frequency": 280,
+            "mix": 0.7
+          }
+        },
+        {
+          "name": "Bitcrusher",
+          "params": {
+            "bit_depth": 6,
+            "downsample": 2
+          }
+        }
       ],
       "builtin": true
     },
     {
       "name": "Vinyl Nostalgia",
       "description": "Warm crackly old record",
-      "tags": ["Lo-fi", "Subtle"],
+      "tags": [
+        "Lo-fi",
+        "Subtle"
+      ],
       "effects": [
-        {"name": "Vinyl", "params": {"amount": 0.5}},
-        {"name": "OTT", "params": {"depth": 0.4}}
+        {
+          "name": "Vinyl",
+          "params": {
+            "amount": 0.5
+          }
+        },
+        {
+          "name": "OTT",
+          "params": {
+            "depth": 0.4
+          }
+        }
       ],
       "builtin": true
     },
     {
       "name": "Chaos Engine",
       "description": "Total audio destruction",
-      "tags": ["Aggressive", "Experimental", "Glitch"],
+      "tags": [
+        "Aggressive",
+        "Experimental",
+        "Glitch"
+      ],
       "effects": [
-        {"name": "Datamosh", "params": {"block_size": 256, "chaos": 0.8}},
-        {"name": "Granular", "params": {"grain_ms": 20, "density": 6, "chaos": 0.9}},
-        {"name": "Stutter", "params": {"repeats": 8, "size_ms": 30}}
+        {
+          "name": "Datamosh",
+          "params": {
+            "block_size": 256,
+            "chaos": 0.8
+          }
+        },
+        {
+          "name": "Granular",
+          "params": {
+            "grain_ms": 20,
+            "density": 6,
+            "chaos": 0.9
+          }
+        },
+        {
+          "name": "Stutter",
+          "params": {
+            "repeats": 8,
+            "size_ms": 30
+          }
+        }
       ],
       "builtin": true
     },
     {
       "name": "Dreamy Slowdown",
       "description": "Lush slow ambient pad",
-      "tags": ["Ambient", "Subtle"],
+      "tags": [
+        "Ambient",
+        "Subtle"
+      ],
       "effects": [
-        {"name": "Time Stretch", "params": {"factor": 0.6}},
-        {"name": "Chorus", "params": {"depth_ms": 8.0, "rate_hz": 0.8, "voices": 3, "mix": 0.6}},
-        {"name": "Filter", "params": {"filter_type": "lowpass", "cutoff_hz": 3000, "resonance": 1.5}}
+        {
+          "name": "Time Stretch",
+          "params": {
+            "factor": 0.6
+          }
+        },
+        {
+          "name": "Chorus",
+          "params": {
+            "depth_ms": 8.0,
+            "rate_hz": 0.8,
+            "voices": 3,
+            "mix": 0.6
+          }
+        },
+        {
+          "name": "Filter",
+          "params": {
+            "filter_type": "lowpass",
+            "cutoff_hz": 3000,
+            "resonance": 1.5
+          }
+        }
       ],
       "builtin": true
     },
     {
       "name": "Thick Chorus",
       "description": "Rich doubled vocal/synth",
-      "tags": ["Vocal", "Clean"],
+      "tags": [
+        "Vocal",
+        "Clean"
+      ],
       "effects": [
-        {"name": "Chorus", "params": {"depth_ms": 6.0, "rate_hz": 1.2, "voices": 3, "mix": 0.5}},
-        {"name": "OTT", "params": {"depth": 0.3}}
+        {
+          "name": "Chorus",
+          "params": {
+            "depth_ms": 6.0,
+            "rate_hz": 1.2,
+            "voices": 3,
+            "mix": 0.5
+          }
+        },
+        {
+          "name": "OTT",
+          "params": {
+            "depth": 0.3
+          }
+        }
       ],
       "builtin": true
     },
     {
       "name": "Tube Warmth",
       "description": "Subtle analog saturation",
-      "tags": ["Subtle", "Lo-fi"],
+      "tags": [
+        "Subtle",
+        "Lo-fi"
+      ],
       "effects": [
-        {"name": "Distortion", "params": {"drive": 2.5, "tone": 0.6, "mode": "tube"}},
-        {"name": "Volume", "params": {"gain_pct": 80}}
+        {
+          "name": "Distortion",
+          "params": {
+            "drive": 2.5,
+            "tone": 0.6,
+            "mode": "tube"
+          }
+        },
+        {
+          "name": "Volume",
+          "params": {
+            "gain_pct": 80
+          }
+        }
       ],
       "builtin": true
     },
     {
       "name": "Psycho Phaser",
       "description": "Trippy sweeping modulation",
-      "tags": ["Psychedelic", "Experimental"],
+      "tags": [
+        "Psychedelic",
+        "Experimental"
+      ],
       "effects": [
-        {"name": "Phaser", "params": {"rate_hz": 0.3, "depth": 0.9, "stages": 6, "mix": 0.8}},
-        {"name": "Delay", "params": {"delay_ms": 250, "feedback": 0.6, "mix": 0.3}}
+        {
+          "name": "Phaser",
+          "params": {
+            "rate_hz": 0.3,
+            "depth": 0.9,
+            "stages": 6,
+            "mix": 0.8
+          }
+        },
+        {
+          "name": "Delay",
+          "params": {
+            "delay_ms": 250,
+            "feedback": 0.6,
+            "mix": 0.3
+          }
+        }
       ],
       "builtin": true
     },
     {
       "name": "Sidechain Pulse",
       "description": "Rhythmic volume pumping",
-      "tags": ["Rhythmic", "Bass"],
+      "tags": [
+        "Rhythmic",
+        "Bass"
+      ],
       "effects": [
-        {"name": "Tremolo", "params": {"rate_hz": 4.0, "depth": 0.8, "shape": "sine"}}
+        {
+          "name": "Tremolo",
+          "params": {
+            "rate_hz": 4.0,
+            "depth": 0.8,
+            "shape": "sine"
+          }
+        }
       ],
       "builtin": true
     },
     {
       "name": "Fuzz Demon",
       "description": "Aggressive fuzz distortion",
-      "tags": ["Aggressive", "Bass"],
+      "tags": [
+        "Aggressive",
+        "Bass"
+      ],
       "effects": [
-        {"name": "Distortion", "params": {"drive": 12.0, "tone": 0.3, "mode": "fuzz"}},
-        {"name": "Filter", "params": {"filter_type": "lowpass", "cutoff_hz": 2000, "resonance": 2.0}}
+        {
+          "name": "Distortion",
+          "params": {
+            "drive": 12.0,
+            "tone": 0.3,
+            "mode": "fuzz"
+          }
+        },
+        {
+          "name": "Filter",
+          "params": {
+            "filter_type": "lowpass",
+            "cutoff_hz": 2000,
+            "resonance": 2.0
+          }
+        }
       ],
       "builtin": true
     },
     {
       "name": "Cinematic Riser",
       "description": "Tension-building sweep",
-      "tags": ["Cinematic", "Ambient"],
+      "tags": [
+        "Cinematic",
+        "Ambient"
+      ],
       "effects": [
-        {"name": "Time Stretch", "params": {"factor": 0.4}},
-        {"name": "Reverse", "params": {}},
-        {"name": "Filter", "params": {"filter_type": "highpass", "cutoff_hz": 800, "resonance": 4.0}},
-        {"name": "Delay", "params": {"delay_ms": 500, "feedback": 0.7, "mix": 0.4}}
+        {
+          "name": "Time Stretch",
+          "params": {
+            "factor": 0.4
+          }
+        },
+        {
+          "name": "Reverse",
+          "params": {}
+        },
+        {
+          "name": "Filter",
+          "params": {
+            "filter_type": "highpass",
+            "cutoff_hz": 800,
+            "resonance": 4.0
+          }
+        },
+        {
+          "name": "Delay",
+          "params": {
+            "delay_ms": 500,
+            "feedback": 0.7,
+            "mix": 0.4
+          }
+        }
       ],
       "builtin": true
     },
     {
       "name": "Nightcore",
       "description": "Sped up & pitched high",
-      "tags": ["Vocal", "Dariacore"],
+      "tags": [
+        "Vocal",
+        "Dariacore"
+      ],
       "effects": [
-        {"name": "Time Stretch", "params": {"factor": 1.25}},
-        {"name": "Pitch Shift", "params": {"semitones": 4, "simple": true}}
+        {
+          "name": "Time Stretch",
+          "params": {
+            "factor": 1.25
+          }
+        },
+        {
+          "name": "Pitch Shift",
+          "params": {
+            "semitones": 4,
+            "simple": true
+          }
+        }
       ],
       "builtin": true
     },
     {
       "name": "Glitch Hop",
       "description": "Choppy rhythmic stutter",
-      "tags": ["Glitch", "Rhythmic"],
+      "tags": [
+        "Glitch",
+        "Rhythmic"
+      ],
       "effects": [
-        {"name": "Shuffle", "params": {"num_slices": 8}},
-        {"name": "Stutter", "params": {"repeats": 3, "size_ms": 60}},
-        {"name": "Bitcrusher", "params": {"bit_depth": 10, "downsample": 1}}
+        {
+          "name": "Shuffle",
+          "params": {
+            "num_slices": 8
+          }
+        },
+        {
+          "name": "Stutter",
+          "params": {
+            "repeats": 3,
+            "size_ms": 60
+          }
+        },
+        {
+          "name": "Bitcrusher",
+          "params": {
+            "bit_depth": 10,
+            "downsample": 1
+          }
+        }
+      ],
+      "builtin": true
+    },
+    {
+      "name": "Hard Autotune",
+      "description": "T-Pain / 100 gecs style hard pitch snap",
+      "tags": [
+        "Autotune",
+        "Hyperpop",
+        "Vocal"
+      ],
+      "effects": [
+        {
+          "name": "autotune",
+          "params": {
+            "speed": 1.0,
+            "key": "C",
+            "scale": "chromatic",
+            "mix": 1.0
+          }
+        }
+      ],
+      "builtin": true
+    },
+    {
+      "name": "Soft Autotune (Minor)",
+      "description": "Gentle pitch correction in A minor",
+      "tags": [
+        "Autotune",
+        "Vocal",
+        "Clean"
+      ],
+      "effects": [
+        {
+          "name": "autotune",
+          "params": {
+            "speed": 0.4,
+            "key": "A",
+            "scale": "minor",
+            "mix": 0.8
+          }
+        }
+      ],
+      "builtin": true
+    },
+    {
+      "name": "Autotune + Reverb Wash",
+      "description": "Tuned vocals with delay tail",
+      "tags": [
+        "Autotune",
+        "Emocore",
+        "Vocal"
+      ],
+      "effects": [
+        {
+          "name": "autotune",
+          "params": {
+            "speed": 0.7,
+            "key": "E",
+            "scale": "minor",
+            "mix": 1.0
+          }
+        },
+        {
+          "name": "delay",
+          "params": {
+            "delay_ms": 300,
+            "feedback": 0.35,
+            "mix": 0.3
+          }
+        }
+      ],
+      "builtin": true
+    },
+    {
+      "name": "Digicore Vocal Edit",
+      "description": "Autotuned + chopped + pitched up vocals",
+      "tags": [
+        "Digicore",
+        "Hyperpop",
+        "Vocal"
+      ],
+      "effects": [
+        {
+          "name": "autotune",
+          "params": {
+            "speed": 0.9,
+            "key": "C",
+            "scale": "major",
+            "mix": 1.0
+          }
+        },
+        {
+          "name": "pitch_shift",
+          "params": {
+            "semitones": 2,
+            "simple": false
+          }
+        },
+        {
+          "name": "vocal_chop",
+          "params": {
+            "bpm": 150,
+            "pattern": "glitch",
+            "gate_shape": 0.7,
+            "pitch_variation": 0.3,
+            "reverse_hits": false
+          }
+        }
+      ],
+      "builtin": true
+    },
+    {
+      "name": "Hyperpop Maximum",
+      "description": "Full hyperpop treatment — loud, bright, wide",
+      "tags": [
+        "Hyperpop",
+        "Aggressive"
+      ],
+      "effects": [
+        {
+          "name": "autotune",
+          "params": {
+            "speed": 1.0,
+            "key": "C",
+            "scale": "chromatic",
+            "mix": 1.0
+          }
+        },
+        {
+          "name": "hyper",
+          "params": {
+            "intensity": 0.8,
+            "shimmer": 0.5,
+            "brightness": 0.7,
+            "crush": 0.1,
+            "width": 0.6
+          }
+        },
+        {
+          "name": "delay",
+          "params": {
+            "delay_ms": 180,
+            "feedback": 0.25,
+            "mix": 0.2
+          }
+        }
+      ],
+      "builtin": true
+    },
+    {
+      "name": "Hyperpop Lite",
+      "description": "Subtle hyperpop shimmer + compression",
+      "tags": [
+        "Hyperpop",
+        "Subtle"
+      ],
+      "effects": [
+        {
+          "name": "hyper",
+          "params": {
+            "intensity": 0.4,
+            "shimmer": 0.2,
+            "brightness": 0.3,
+            "crush": 0.0,
+            "width": 0.3
+          }
+        }
+      ],
+      "builtin": true
+    },
+    {
+      "name": "Robot Voice (Théa)",
+      "description": "Granular robotic digital voice",
+      "tags": [
+        "Digicore",
+        "Experimental",
+        "Vocal"
+      ],
+      "effects": [
+        {
+          "name": "robot",
+          "params": {
+            "grain_ms": 8,
+            "robot_amount": 0.7,
+            "metallic": 0.4,
+            "digital_noise": 0.2,
+            "monotone": 0.0,
+            "pitch_hz": 150
+          }
+        }
+      ],
+      "builtin": true
+    },
+    {
+      "name": "Robot Monotone",
+      "description": "Flat-pitch robotic voice — full monotone",
+      "tags": [
+        "Experimental",
+        "Vocal"
+      ],
+      "effects": [
+        {
+          "name": "robot",
+          "params": {
+            "grain_ms": 6,
+            "robot_amount": 0.8,
+            "metallic": 0.5,
+            "digital_noise": 0.3,
+            "monotone": 0.8,
+            "pitch_hz": 180
+          }
+        }
+      ],
+      "builtin": true
+    },
+    {
+      "name": "Cyborg Subtle",
+      "description": "Light robotic texture — still sounds human",
+      "tags": [
+        "Subtle",
+        "Vocal",
+        "Electro"
+      ],
+      "effects": [
+        {
+          "name": "robot",
+          "params": {
+            "grain_ms": 15,
+            "robot_amount": 0.3,
+            "metallic": 0.15,
+            "digital_noise": 0.05,
+            "monotone": 0.0,
+            "pitch_hz": 150
+          }
+        }
+      ],
+      "builtin": true
+    },
+    {
+      "name": "Emocore Vocal",
+      "description": "Tuned vocals + tape wobble + delay",
+      "tags": [
+        "Emocore",
+        "Vocal",
+        "Lo-fi"
+      ],
+      "effects": [
+        {
+          "name": "autotune",
+          "params": {
+            "speed": 0.6,
+            "key": "A",
+            "scale": "minor",
+            "mix": 0.9
+          }
+        },
+        {
+          "name": "tape_glitch",
+          "params": {
+            "glitch_rate": 0.1,
+            "dropout_chance": 0.05,
+            "wow": 0.2,
+            "flutter": 0.15,
+            "noise": 0.08
+          }
+        },
+        {
+          "name": "delay",
+          "params": {
+            "delay_ms": 350,
+            "feedback": 0.4,
+            "mix": 0.25
+          }
+        }
+      ],
+      "builtin": true
+    },
+    {
+      "name": "Glitch Storm",
+      "description": "Vocal chop chaos + stutter + datamosh",
+      "tags": [
+        "Glitch",
+        "Digicore",
+        "Aggressive"
+      ],
+      "effects": [
+        {
+          "name": "vocal_chop",
+          "params": {
+            "bpm": 160,
+            "pattern": "chaos",
+            "gate_shape": 0.6,
+            "pitch_variation": 0.5,
+            "reverse_hits": true
+          }
+        },
+        {
+          "name": "stutter",
+          "params": {
+            "repeats": 6,
+            "decay": 0.3,
+            "stutter_mode": "normal"
+          }
+        },
+        {
+          "name": "bitcrusher",
+          "params": {
+            "bit_depth": 8,
+            "downsample": 2
+          }
+        }
+      ],
+      "builtin": true
+    },
+    {
+      "name": "Wave Dream",
+      "description": "Slow undulating wave + phaser + delay",
+      "tags": [
+        "Ambient",
+        "Psychedelic"
+      ],
+      "effects": [
+        {
+          "name": "wave_ondulee",
+          "params": {
+            "speed": 1.5,
+            "pitch_depth": 0.3,
+            "vol_depth": 0.4,
+            "stereo_offset": true
+          }
+        },
+        {
+          "name": "phaser",
+          "params": {
+            "rate_hz": 0.3,
+            "depth": 0.6,
+            "stages": 6,
+            "mix": 0.4
+          }
+        },
+        {
+          "name": "delay",
+          "params": {
+            "delay_ms": 400,
+            "feedback": 0.5,
+            "mix": 0.35
+          }
+        }
+      ],
+      "builtin": true
+    },
+    {
+      "name": "Electro Stutter",
+      "description": "Fast rhythmic chop + bitcrush + distortion",
+      "tags": [
+        "Electro",
+        "Glitch",
+        "Rhythmic"
+      ],
+      "effects": [
+        {
+          "name": "vocal_chop",
+          "params": {
+            "bpm": 130,
+            "pattern": "rapid",
+            "gate_shape": 0.5,
+            "pitch_variation": 0.0,
+            "reverse_hits": false
+          }
+        },
+        {
+          "name": "bitcrusher",
+          "params": {
+            "bit_depth": 10,
+            "downsample": 1
+          }
+        },
+        {
+          "name": "distortion",
+          "params": {
+            "drive": 3.0,
+            "tone": 0.6,
+            "mode": "tube"
+          }
+        }
+      ],
+      "builtin": true
+    },
+    {
+      "name": "Dariacore Smash",
+      "description": "Pitched + chopped + granular chaos",
+      "tags": [
+        "Dariacore",
+        "Glitch",
+        "Aggressive"
+      ],
+      "effects": [
+        {
+          "name": "pitch_shift",
+          "params": {
+            "semitones": 5,
+            "simple": true
+          }
+        },
+        {
+          "name": "vocal_chop",
+          "params": {
+            "bpm": 170,
+            "pattern": "glitch",
+            "gate_shape": 0.6,
+            "pitch_variation": 0.8,
+            "reverse_hits": true
+          }
+        },
+        {
+          "name": "granular",
+          "params": {
+            "grain_ms": 30,
+            "density": 6,
+            "chaos": 0.7
+          }
+        }
+      ],
+      "builtin": true
+    },
+    {
+      "name": "Lo-fi Tape Mess",
+      "description": "Heavy tape degradation — warped and broken",
+      "tags": [
+        "Lo-fi",
+        "Tape",
+        "Experimental"
+      ],
+      "effects": [
+        {
+          "name": "tape_glitch",
+          "params": {
+            "glitch_rate": 0.6,
+            "dropout_chance": 0.3,
+            "wow": 0.5,
+            "flutter": 0.5,
+            "noise": 0.2
+          }
+        },
+        {
+          "name": "vinyl",
+          "params": {
+            "amount": 0.4
+          }
+        },
+        {
+          "name": "filter",
+          "params": {
+            "filter_type": "lowpass",
+            "cutoff_hz": 4000,
+            "resonance": 1.0
+          }
+        }
+      ],
+      "builtin": true
+    },
+    {
+      "name": "Nightcore Classic",
+      "description": "Pitched up + sped up — anime vibes",
+      "tags": [
+        "Hyperpop",
+        "Vocal"
+      ],
+      "effects": [
+        {
+          "name": "pitch_shift",
+          "params": {
+            "semitones": 4,
+            "simple": false
+          }
+        },
+        {
+          "name": "hyper",
+          "params": {
+            "intensity": 0.3,
+            "shimmer": 0.15,
+            "brightness": 0.4,
+            "crush": 0.0,
+            "width": 0.3
+          }
+        }
+      ],
+      "builtin": true
+    },
+    {
+      "name": "Digital Angel",
+      "description": "Autotuned + shimmer + chorus — ethereal",
+      "tags": [
+        "Hyperpop",
+        "Ambient",
+        "Vocal"
+      ],
+      "effects": [
+        {
+          "name": "autotune",
+          "params": {
+            "speed": 0.8,
+            "key": "E",
+            "scale": "major",
+            "mix": 1.0
+          }
+        },
+        {
+          "name": "hyper",
+          "params": {
+            "intensity": 0.3,
+            "shimmer": 0.6,
+            "brightness": 0.4,
+            "crush": 0.0,
+            "width": 0.5
+          }
+        },
+        {
+          "name": "chorus",
+          "params": {
+            "depth_ms": 4.0,
+            "rate_hz": 1.0,
+            "mix": 0.3,
+            "voices": 3
+          }
+        }
+      ],
+      "builtin": true
+    },
+    {
+      "name": "Broken Bot",
+      "description": "Robot + glitches + tape errors",
+      "tags": [
+        "Experimental",
+        "Glitch",
+        "Digicore"
+      ],
+      "effects": [
+        {
+          "name": "robot",
+          "params": {
+            "grain_ms": 5,
+            "robot_amount": 0.9,
+            "metallic": 0.6,
+            "digital_noise": 0.4,
+            "monotone": 0.3,
+            "pitch_hz": 120
+          }
+        },
+        {
+          "name": "tape_glitch",
+          "params": {
+            "glitch_rate": 0.5,
+            "dropout_chance": 0.2,
+            "wow": 0.1,
+            "flutter": 0.3,
+            "noise": 0.05
+          }
+        },
+        {
+          "name": "stutter",
+          "params": {
+            "repeats": 3,
+            "decay": 0.5,
+            "stutter_mode": "normal"
+          }
+        }
       ],
       "builtin": true
     }

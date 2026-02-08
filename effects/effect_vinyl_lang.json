@@ -1,0 +1,12 @@
+{
+  "en": {
+    "name": "Vinyl",
+    "short": "Adds crackle, hiss and warmth like old records",
+    "detail": "Simulates vinyl playback imperfections — pops, crackles, surface noise. Amount controls how worn the record sounds."
+  },
+  "fr": {
+    "name": "Vinyl",
+    "short": "Ajoute craquements, souffle et chaleur vinyle",
+    "detail": "Simule les imperfections d'un vinyle — pops, craquements, bruit de surface. Amount contrôle l'usure du disque."
+  }
+}

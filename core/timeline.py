@@ -1,10 +1,27 @@
 """
 Timeline model — manages AudioClip instances in sequence.
+Auto-assigns visually distinct colors to new clips.
 """
 
 import uuid
+import colorsys
 import numpy as np
 from dataclasses import dataclass, field
+
+
+# ── Distinct color generator ──
+# Uses golden-angle hue rotation for maximum visual separation
+
+_GOLDEN_ANGLE = 137.508  # degrees
+
+def _generate_distinct_color(index: int) -> str:
+    """Generate a visually distinct color for clip index using golden-angle hue rotation."""
+    hue = (index * _GOLDEN_ANGLE) % 360 / 360.0
+    # High saturation + medium-high lightness for dark backgrounds
+    sat = 0.65 + (index % 3) * 0.1   # 0.65-0.85
+    lit = 0.50 + (index % 2) * 0.08  # 0.50-0.58
+    r, g, b = colorsys.hls_to_rgb(hue, lit, sat)
+    return f"#{int(r*255):02x}{int(g*255):02x}{int(b*255):02x}"
 
 
 @dataclass
@@ -14,7 +31,7 @@ class AudioClip:
     audio_data: np.ndarray
     sample_rate: int = 44100
     position: int = 0       # sample offset in timeline
-    color: str = "#533483"
+    color: str = ""
     id: str = field(default_factory=lambda: uuid.uuid4().hex[:8])
 
     @property
@@ -36,18 +53,26 @@ class Timeline:
     def __init__(self):
         self.clips: list[AudioClip] = []
         self.sample_rate: int = 44100
+        self._color_counter: int = 0
 
     def clear(self):
         self.clips.clear()
 
     def add_clip(self, audio_data: np.ndarray, sr: int,
                  name: str = "Clip", position: int | None = None,
-                 color: str = "#533483"):
-        """Add a clip. If position is None, append after last clip."""
+                 color: str = "", copy: bool = True):
+        """Add a clip. If position is None, append after last clip.
+        If color is empty, auto-assigns a distinct color."""
         if position is None:
             position = max((c.end_position for c in self.clips), default=0)
+
+        if not color:
+            # Auto-assign distinct color
+            color = _generate_distinct_color(self._color_counter)
+            self._color_counter += 1
+
         clip = AudioClip(
-            name=name, audio_data=audio_data.copy(),
+            name=name, audio_data=audio_data.copy() if copy else audio_data,
             sample_rate=sr, position=position, color=color
         )
         self.clips.append(clip)
@@ -59,7 +84,6 @@ class Timeline:
         if not self.clips:
             return np.zeros((0, 2), dtype=np.float32), self.sample_rate
 
-        # Sort clips by position
         self.clips.sort(key=lambda c: c.position)
 
         total = max(c.end_position for c in self.clips)
@@ -69,7 +93,6 @@ class Timeline:
             d = clip.audio_data
             if d is None or len(d) == 0:
                 continue
-            # Ensure stereo
             if d.ndim == 1:
                 d = np.column_stack([d, d])
             elif d.shape[1] == 1:

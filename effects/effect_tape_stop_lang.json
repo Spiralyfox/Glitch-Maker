@@ -1,0 +1,12 @@
+{
+  "en": {
+    "name": "Tape Stop",
+    "short": "Simulates a tape deck slowing to a halt",
+    "detail": "Gradually slows down the audio like pressing stop on a cassette player. Duration controls how long the slowdown takes."
+  },
+  "fr": {
+    "name": "Tape Stop",
+    "short": "Simule une cassette qui s'arrête",
+    "detail": "Ralentit progressivement l'audio comme quand on appuie stop sur un lecteur cassette. La durée contrôle le temps de ralentissement."
+  }
+}

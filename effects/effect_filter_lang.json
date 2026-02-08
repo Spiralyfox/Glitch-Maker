@@ -1,0 +1,12 @@
+{
+  "en": {
+    "name": "Filter",
+    "short": "Sculpts frequency content",
+    "detail": "Removes frequencies above (lowpass) or below (highpass) a cutoff point. Resonance adds a peak at the cutoff for that classic synth sweep sound."
+  },
+  "fr": {
+    "name": "Filter",
+    "short": "Sculpte le contenu fréquentiel",
+    "detail": "Supprime les fréquences au-dessus (passe-bas) ou en-dessous (passe-haut) d'un point de coupure. La résonance ajoute un pic pour ce son de sweep synthé classique."
+  }
+}

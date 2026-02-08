@@ -1,0 +1,12 @@
+{
+  "en": {
+    "name": "Delay",
+    "short": "Repeating echo effect",
+    "detail": "Creates copies of the sound at timed intervals. Time sets the gap, feedback controls repeat count. Essential for spacey vibes."
+  },
+  "fr": {
+    "name": "Delay",
+    "short": "Effet d'écho répété",
+    "detail": "Crée des copies du son à intervalles réguliers. Le time règle l'écart, le feedback contrôle les répétitions."
+  }
+}

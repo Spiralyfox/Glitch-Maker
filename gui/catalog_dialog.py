@@ -1,6 +1,6 @@
 """
 Effect catalog — beginner-friendly descriptions from lang files.
-All 21 effects sorted alphabetically.
+All 28 effects sorted alphabetically.
 """
 
 from PyQt6.QtWidgets import (
@@ -14,27 +14,34 @@ from utils.translator import t
 
 # (letter, color, cat_key) — sorted alphabetically by effect name
 ENTRIES = sorted([
-    ("S", "#e94560",  "stutter"),
+    ("\u266a", "#f72585",  "autotune"),
     ("B", "#533483",  "bitcrusher"),
-    ("D", "#ff6b35",  "saturation"),
-    ("R", "#0f3460",  "reverse"),
-    ("P", "#16c79a",  "pitch_shift"),
-    ("T", "#c74b50",  "time_stretch"),
-    ("G", "#7b2d8e",  "granular"),
-    ("X", "#3d5a80",  "tape_stop"),
     ("F", "#457b9d",  "buffer_freeze"),
-    ("E", "#2a9d8f",  "delay"),
-    ("M", "#6d597a",  "ring_mod"),
-    ("L", "#264653",  "filter"),
-    ("O", "#e76f51",  "ott"),
-    ("V", "#606c38",  "vinyl"),
-    ("Z", "#9b2226",  "datamosh"),
-    ("K", "#bb3e03",  "shuffle"),
-    ("U", "#4cc9f0",  "volume"),
     ("C", "#2a6478",  "chorus"),
-    ("~", "#e07c24",  "tremolo"),
-    ("A", "#6d597a",  "phaser"),
+    ("Z", "#9b2226",  "datamosh"),
+    ("E", "#2a9d8f",  "delay"),
     ("W", "#b5179e",  "distortion"),
+    ("L", "#264653",  "filter"),
+    ("G", "#7b2d8e",  "granular"),
+    ("\u26a1","#ff006e",  "hyper"),
+    ("O", "#e76f51",  "ott"),
+    ("\u229d", "#2563eb",  "pan"),
+    ("A", "#6d597a",  "phaser"),
+    ("P", "#16c79a",  "pitch_shift"),
+    ("\u3030", "#0ea5e9",  "wave_ondulee"),
+    ("R", "#0f3460",  "reverse"),
+    ("M", "#6d597a",  "ring_mod"),
+    ("\U0001f916","#4a00e0",  "robot"),
+    ("D", "#ff6b35",  "saturation"),
+    ("K", "#bb3e03",  "shuffle"),
+    ("S", "#e94560",  "stutter"),
+    ("\U0001f4fc","#6b705c",  "tape_glitch"),
+    ("X", "#3d5a80",  "tape_stop"),
+    ("T", "#c74b50",  "time_stretch"),
+    ("~", "#e07c24",  "tremolo"),
+    ("V", "#606c38",  "vinyl"),
+    ("\u2702", "#7209b7",  "vocal_chop"),
+    ("U", "#4cc9f0",  "volume"),
 ], key=lambda x: t(f"cat.{x[2]}.name"))
 
 

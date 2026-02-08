@@ -1,0 +1,12 @@
+{
+  "en": {
+    "name": "Datamosh",
+    "short": "Corrupts audio like a broken file",
+    "detail": "Swaps random chunks of audio data, like a corrupted MP3. Block size controls glitch granularity, chaos controls intensity."
+  },
+  "fr": {
+    "name": "Datamosh",
+    "short": "Corrompt l'audio comme un fichier cassé",
+    "detail": "Échange des blocs d'audio aléatoirement, comme un MP3 corrompu. La taille des blocs contrôle la granularité."
+  }
+}

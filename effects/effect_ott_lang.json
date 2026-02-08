@@ -1,0 +1,12 @@
+{
+  "en": {
+    "name": "OTT",
+    "short": "Extreme multiband compression",
+    "detail": "Over-The-Top compression that squashes dynamics in 3 bands (low/mid/high). Makes everything louder and punchier."
+  },
+  "fr": {
+    "name": "OTT",
+    "short": "Compression multibande extrême",
+    "detail": "Compression Over-The-Top qui écrase la dynamique en 3 bandes (low/mid/high). Rend tout plus fort et percutant."
+  }
+}

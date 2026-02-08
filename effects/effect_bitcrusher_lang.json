@@ -1,0 +1,12 @@
+{
+  "en": {
+    "name": "Bitcrusher",
+    "short": "Reduces bit depth for lo-fi crunch",
+    "detail": "Strips away audio resolution by reducing bit depth (24→8→4 bits). Lower values = more crunchy and digital."
+  },
+  "fr": {
+    "name": "Bitcrusher",
+    "short": "Réduit la résolution pour un son lo-fi crunchy",
+    "detail": "Supprime de la résolution en réduisant la profondeur de bits (24→8→4). Plus bas = plus crunchy et digital."
+  }
+}

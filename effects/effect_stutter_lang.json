@@ -1,0 +1,12 @@
+{
+  "en": {
+    "name": "Stutter",
+    "short": "Rapid-fire repeats of tiny segments",
+    "detail": "Takes a piece of audio and repeats it multiple times rapidly. The classic glitch/EDM stutter effect."
+  },
+  "fr": {
+    "name": "Stutter",
+    "short": "Répétitions rapides de petits segments",
+    "detail": "Prend un morceau d'audio et le répète rapidement plusieurs fois. L'effet stutter classique glitch/EDM."
+  }
+}

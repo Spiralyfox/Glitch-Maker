@@ -1,0 +1,12 @@
+{
+  "en": {
+    "name": "Saturation",
+    "short": "Adds harmonic warmth or aggressive clipping",
+    "detail": "Three flavors: Hard Clip chops peaks brutally, Soft Clip rounds them gently, Overdrive adds tube-like warmth. Drive controls how much."
+  },
+  "fr": {
+    "name": "Saturation",
+    "short": "Ajoute de la chaleur harmonique ou du clipping agressif",
+    "detail": "Trois saveurs : Hard Clip coupe les crêtes brutalement, Soft Clip les arrondit, Overdrive ajoute de la chaleur tube."
+  }
+}

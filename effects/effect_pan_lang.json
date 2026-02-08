@@ -1,0 +1,12 @@
+{
+  "en": {
+    "name": "Pan / Stereo",
+    "short": "Move audio left/right or convert to mono",
+    "detail": "Pan knob sweeps audio between left and right speakers using constant-power panning. Check 'Mono' to merge both channels into identical signal."
+  },
+  "fr": {
+    "name": "Pan / Stéréo",
+    "short": "Déplace le son gauche/droite ou convertit en mono",
+    "detail": "Bouton rotatif pour panoramique gauche-droite avec puissance constante. Option mono pour fusionner les deux canaux en signal identique."
+  }
+}

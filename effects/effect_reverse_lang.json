@@ -1,0 +1,12 @@
+{
+  "en": {
+    "name": "Reverse",
+    "short": "Plays audio backwards",
+    "detail": "Flips the selected audio so it plays in reverse. Simple but powerful — reversed reverb tails, vocals, and crashes are iconic in music production."
+  },
+  "fr": {
+    "name": "Reverse",
+    "short": "Joue l'audio à l'envers",
+    "detail": "Inverse l'audio sélectionné. Simple mais puissant — les reverbs, voix et crashs inversés sont iconiques en production musicale."
+  }
+}

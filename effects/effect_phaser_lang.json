@@ -1,0 +1,12 @@
+{
+  "en": {
+    "name": "Phaser",
+    "short": "Sweeping notch filter for a whoosh effect",
+    "detail": "Moves notch filters through the audio, creating a jet-engine whooshing sound. Rate controls speed, stages control depth."
+  },
+  "fr": {
+    "name": "Phaser",
+    "short": "Filtre balayant pour un effet whoosh",
+    "detail": "Déplace une série de filtres notch à travers l'audio, créant le son classique de réacteur."
+  }
+}
