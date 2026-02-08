@@ -15,7 +15,6 @@
   "menu.options.language": "Language",
   "menu.options.select_all": "Select all",
   "menu.options.import_effect": "Import effect...",
-  "menu.options.ffmpeg_browse": "Locate FFmpeg...",
   "menu.effects": "&Effects",
   "menu.effects.catalog": "Effect catalog",
   "menu.help": "&Help",

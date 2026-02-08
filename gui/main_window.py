@@ -23,7 +23,7 @@ from gui.preset_dialog import PresetCreateDialog, PresetManageDialog, TagManageD
 
 from core.audio_engine import (
     load_audio, export_audio, ensure_stereo, get_duration, format_time,
-    ffmpeg_status
+    ffmpeg_available, download_ffmpeg
 )
 from core.playback import PlaybackEngine
 from core.timeline import Timeline, AudioClip
@@ -75,6 +75,19 @@ class UndoState:
         self.desc = desc
         self.base_audio = base_audio
         self.global_effects = dict(global_effects) if global_effects else {}
+
+
+class _FFmpegDownloadThread(QThread):
+    """Background thread to auto-download FFmpeg on first run."""
+    status = Signal(str)
+
+    def run(self):
+        try:
+            self.status.emit("Downloading FFmpeg...")
+            download_ffmpeg(progress_cb=lambda msg: self.status.emit(msg))
+            self.status.emit("✓ FFmpeg installed — all formats supported")
+        except Exception as e:
+            self.status.emit(f"FFmpeg auto-install failed: {e}")
 
 
 class MainWindow(QMainWindow):
@@ -134,6 +147,12 @@ class MainWindow(QMainWindow):
                 border: 1px solid {COLORS['accent']}; padding: 6px; font-size: 11px; }}
         """)
         self.statusBar().showMessage("Ready")
+
+        # Auto-download FFmpeg in background if not found
+        if not ffmpeg_available():
+            self._ffmpeg_thread = _FFmpegDownloadThread(self)
+            self._ffmpeg_thread.status.connect(lambda msg: self.statusBar().showMessage(msg))
+            self._ffmpeg_thread.start()
 
     # ══════ UI Build ══════
 
@@ -224,8 +243,6 @@ class MainWindow(QMainWindow):
         self._menu_action(om, t("menu.options.select_all"), "Ctrl+A", self._select_all)
         om.addSeparator()
         self._menu_action(om, t("menu.options.import_effect"), "", self._import_effect)
-        om.addSeparator()
-        self._menu_action(om, t("menu.options.ffmpeg_browse"), "", self._browse_ffmpeg)
 
         # Effects (dynamically built from plugins)
         efm = mb.addMenu(t("menu.effects"))
@@ -246,7 +263,6 @@ class MainWindow(QMainWindow):
         # Help
         hm = mb.addMenu(t("menu.help"))
         self._menu_action(hm, t("menu.help.about"), "", lambda: AboutDialog(self).exec())
-        self._menu_action(hm, "FFmpeg Status", "", self._show_ffmpeg_status)
 
     def _menu_action(self, menu, text, shortcut, slot) -> QAction:
         a = menu.addAction(text)
@@ -891,34 +907,6 @@ class MainWindow(QMainWindow):
         except Exception as ex:
             QMessageBox.critical(self, "Import Error", str(ex))
 
-    def _browse_ffmpeg(self):
-        from PyQt6.QtWidgets import QFileDialog
-        from core.audio_engine import _find_ffmpeg, set_ffmpeg_path
-        current = _find_ffmpeg()
-        if current:
-            reply = QMessageBox.question(
-                self, "FFmpeg",
-                f"FFmpeg already found:\n{current}\n\nBrowse for a different one?",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
-            if reply != QMessageBox.StandardButton.Yes:
-                return
-        if os.name == "nt":
-            filt = "ffmpeg (ffmpeg.exe)"
-        else:
-            filt = "ffmpeg (ffmpeg)"
-        path, _ = QFileDialog.getOpenFileName(self, "Locate FFmpeg", "", filt)
-        if not path:
-            return
-        try:
-            set_ffmpeg_path(path)
-            settings = load_settings()
-            settings["ffmpeg_path"] = path
-            save_settings(settings)
-            self.statusBar().showMessage(f"FFmpeg set: {path}")
-            QMessageBox.information(self, "FFmpeg", f"✅ FFmpeg configured!\n{path}")
-        except Exception as ex:
-            QMessageBox.critical(self, "FFmpeg", f"Error: {ex}")
-
     # ══════ Timeline ops ══════
 
     def _on_reorder(self):
@@ -1115,9 +1103,6 @@ class MainWindow(QMainWindow):
 
     def _catalog(self):
         CatalogDialog(self).exec()
-
-    def _show_ffmpeg_status(self):
-        QMessageBox.information(self, "FFmpeg Status", ffmpeg_status())
 
     # ══════ Drag & Drop ══════
 

@@ -15,22 +15,27 @@ import soundfile as sf
 
 
 # ═══════════════════════════════════════
-# FFmpeg detection (cached)
+# FFmpeg detection + auto-download
 # ═══════════════════════════════════════
 
 _ffmpeg_cache = None
 _ffmpeg_searched = False
 
+# Directory where we store our own ffmpeg copy
+_FFMPEG_DIR = os.path.join(os.path.expanduser("~"), ".glitchmaker", "ffmpeg")
 
-def set_ffmpeg_path(path: str):
-    """Manually set ffmpeg path (from settings or browse)."""
-    global _ffmpeg_cache, _ffmpeg_searched
-    if os.path.isfile(path):
-        _ffmpeg_cache = path
-        _ffmpeg_searched = True
-        _sync_pydub_ffmpeg()
-    else:
-        raise FileNotFoundError(f"FFmpeg not found at: {path}")
+# Static build download URLs (well-known, stable sources)
+_FFMPEG_URLS = {
+    "win64": "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip",
+    "linux64": "https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz",
+    "macos": "https://evermeet.cx/ffmpeg/ffmpeg-7.1.1.zip",
+}
+
+
+def _our_ffmpeg_path() -> str:
+    """Path where we store our downloaded ffmpeg."""
+    name = "ffmpeg.exe" if os.name == "nt" else "ffmpeg"
+    return os.path.join(_FFMPEG_DIR, name)
 
 
 def _load_ffmpeg_from_settings():
@@ -61,6 +66,12 @@ def _find_ffmpeg() -> str | None:
     if _ffmpeg_searched:
         return _ffmpeg_cache
     _ffmpeg_searched = True
+
+    # 0. Our own downloaded copy
+    our = _our_ffmpeg_path()
+    if os.path.isfile(our):
+        _ffmpeg_cache = our
+        return our
 
     # 1. PATH
     path = shutil.which("ffmpeg")
@@ -159,28 +170,155 @@ def _sync_pydub_ffmpeg():
             pass
 
 
-def ffmpeg_status() -> str:
-    """Return human-readable FFmpeg status for diagnostics."""
-    ffmpeg = _find_ffmpeg()
-    if ffmpeg:
-        try:
-            r = subprocess.run([ffmpeg, "-version"], capture_output=True, text=True, timeout=5,
-                               creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
-            ver = r.stdout.split('\n')[0] if r.stdout else "unknown version"
-            return f"✅ FFmpeg found\n{ffmpeg}\n{ver}"
-        except Exception:
-            return f"⚠️ FFmpeg found but cannot run\n{ffmpeg}"
-    return (
-        "❌ FFmpeg NOT found\n\n"
-        "MP3 export works without FFmpeg (built-in encoder).\n"
-        "But M4A/AAC/OGG import requires FFmpeg.\n\n"
-        "Install:\n"
-        "  Windows:  winget install ffmpeg\n"
-        "  Mac:      brew install ffmpeg\n"
-        "  Linux:    sudo apt install ffmpeg\n\n"
-        "Or use Options → Locate FFmpeg to browse\n"
-        "for ffmpeg.exe on your system."
-    )
+def ffmpeg_available() -> bool:
+    """Quick check: is ffmpeg ready to use?"""
+    return _find_ffmpeg() is not None
+
+
+def download_ffmpeg(progress_cb=None) -> str:
+    """
+    Download a static FFmpeg build to ~/.glitchmaker/ffmpeg/.
+    progress_cb(message: str) is called with status updates.
+    Returns the path to the ffmpeg binary.
+    Raises RuntimeError on failure.
+    """
+    import urllib.request
+    import zipfile
+    import tarfile
+    import platform
+
+    global _ffmpeg_cache, _ffmpeg_searched
+
+    dst = _our_ffmpeg_path()
+    if os.path.isfile(dst):
+        _ffmpeg_cache = dst
+        _ffmpeg_searched = True
+        return dst
+
+    os.makedirs(_FFMPEG_DIR, exist_ok=True)
+
+    # Determine platform
+    system = platform.system().lower()
+    machine = platform.machine().lower()
+
+    if system == "windows":
+        url = _FFMPEG_URLS["win64"]
+    elif system == "linux":
+        url = _FFMPEG_URLS["linux64"]
+    elif system == "darwin":
+        url = _FFMPEG_URLS["macos"]
+    else:
+        raise RuntimeError(f"Unsupported platform: {system}")
+
+    # Download
+    if progress_cb:
+        progress_cb(f"Downloading FFmpeg ({system})...")
+
+    tmp_archive = os.path.join(_FFMPEG_DIR, "_download_tmp")
+    try:
+        urllib.request.urlretrieve(url, tmp_archive)
+    except Exception as e:
+        _cleanup(tmp_archive)
+        raise RuntimeError(f"Download failed: {e}")
+
+    # Extract ffmpeg binary
+    if progress_cb:
+        progress_cb("Extracting FFmpeg...")
+
+    try:
+        if url.endswith(".zip"):
+            _extract_from_zip(tmp_archive, dst, system)
+        elif ".tar" in url:
+            _extract_from_tar(tmp_archive, dst)
+        else:
+            raise RuntimeError(f"Unknown archive format: {url}")
+    except Exception as e:
+        _cleanup(tmp_archive)
+        _cleanup(dst)
+        raise RuntimeError(f"Extraction failed: {e}")
+
+    _cleanup(tmp_archive)
+
+    if not os.path.isfile(dst):
+        raise RuntimeError("FFmpeg binary not found after extraction")
+
+    # Make executable on Unix
+    if os.name != "nt":
+        os.chmod(dst, 0o755)
+
+    # Verify it runs
+    try:
+        r = subprocess.run([dst, "-version"], capture_output=True, text=True, timeout=10,
+                           creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
+        if r.returncode != 0:
+            raise RuntimeError("FFmpeg exits with error")
+    except subprocess.TimeoutExpired:
+        pass  # Some systems are slow, but binary exists
+    except FileNotFoundError:
+        _cleanup(dst)
+        raise RuntimeError("Extracted binary cannot run")
+
+    _ffmpeg_cache = dst
+    _ffmpeg_searched = True
+    _sync_pydub_ffmpeg()
+
+    if progress_cb:
+        progress_cb("FFmpeg ready ✓")
+
+    return dst
+
+
+def _extract_from_zip(archive, dst, system):
+    """Extract ffmpeg binary from a zip archive."""
+    import zipfile
+    target = "ffmpeg.exe" if system == "windows" else "ffmpeg"
+    with zipfile.ZipFile(archive) as zf:
+        # Find the ffmpeg binary inside the zip (may be in a subfolder)
+        candidates = [n for n in zf.namelist()
+                      if n.endswith(f"/{target}") or n.endswith(f"\\{target}")
+                      or n == target]
+        # Prefer bin/ path
+        best = None
+        for c in candidates:
+            if "/bin/" in c or "\\bin\\" in c:
+                best = c
+                break
+        if not best and candidates:
+            best = candidates[0]
+        if not best:
+            raise RuntimeError(f"'{target}' not found in zip")
+
+        with zf.open(best) as src, open(dst, "wb") as out:
+            out.write(src.read())
+
+
+def _extract_from_tar(archive, dst):
+    """Extract ffmpeg binary from a tar(.xz) archive."""
+    import tarfile
+    with tarfile.open(archive) as tf:
+        candidates = [m for m in tf.getmembers()
+                      if m.name.endswith("/ffmpeg") and m.isfile()]
+        if not candidates:
+            candidates = [m for m in tf.getmembers()
+                          if m.name == "ffmpeg" and m.isfile()]
+        if not candidates:
+            raise RuntimeError("'ffmpeg' not found in tar archive")
+
+        best = candidates[0]
+        src = tf.extractfile(best)
+        if src is None:
+            raise RuntimeError("Cannot read ffmpeg from archive")
+        with open(dst, "wb") as out:
+            out.write(src.read())
+
+
+def _cleanup(path):
+    """Remove a file silently."""
+    try:
+        if os.path.isfile(path):
+            os.remove(path)
+    except Exception:
+        pass
 
 
 # ═══════════════════════════════════════
@@ -250,16 +388,18 @@ def load_audio(filepath: str) -> tuple[np.ndarray, int]:
     fname = os.path.basename(filepath)
     needs_ffmpeg = ext in (".mp3", ".m4a", ".aac", ".wma", ".opus")
     if needs_ffmpeg:
+        # Try auto-downloading ffmpeg right now
+        try:
+            download_ffmpeg()
+            # Retry load with ffmpeg now available
+            return load_audio(filepath)
+        except Exception:
+            pass
         raise RuntimeError(
             f"Cannot load '{fname}'.\n\n"
             f"{ext.upper()} files require FFmpeg to decode.\n\n"
-            f"Install FFmpeg:\n"
-            f"  Windows:  winget install ffmpeg\n"
-            f"  Mac:      brew install ffmpeg\n"
-            f"  Linux:    sudo apt install ffmpeg\n\n"
-            f"Or place ffmpeg.exe next to GlitchMaker.exe,\n"
-            f"then RESTART the app.\n\n"
-            f"Tip: WAV and FLAC files load without FFmpeg."
+            f"Auto-download failed. Check your internet connection\n"
+            f"and try again, or load WAV/FLAC files instead."
         )
     raise RuntimeError(
         f"Cannot load '{fname}'.\n\n"
@@ -369,15 +509,19 @@ def export_audio(data: np.ndarray, sr: int, filepath: str, fmt: str = "wav"):
             try: os.unlink(tmp.name)
             except Exception: pass
 
+    # Auto-download ffmpeg and retry
+    try:
+        download_ffmpeg()
+        # Retry now that ffmpeg is available
+        return export_audio(data, sr, filepath)
+    except Exception:
+        pass
+
     raise RuntimeError(
         f"Cannot export to {fmt.upper()}.\n\n"
         f"FFmpeg is required for {fmt.upper()} export.\n\n"
-        f"Install FFmpeg:\n"
-        f"  Windows:  winget install ffmpeg\n"
-        f"  Mac:      brew install ffmpeg\n"
-        f"  Linux:    sudo apt install ffmpeg\n\n"
-        f"Or place ffmpeg.exe next to GlitchMaker.exe,\n"
-        f"then restart the app."
+        f"Auto-download failed. Check your internet connection\n"
+        f"and try again."
     )
 
 
