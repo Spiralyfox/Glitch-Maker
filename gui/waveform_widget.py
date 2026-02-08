@@ -16,6 +16,7 @@ class WaveformWidget(QWidget):
     position_clicked = pyqtSignal(int)   # click → set anchor
     selection_changed = pyqtSignal(int, int)  # drag → selection
     drag_started = pyqtSignal()  # mouse down starts a drag
+    zoom_changed = pyqtSignal(float, float)  # (zoom, offset) — for external scrollbar
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -35,15 +36,15 @@ class WaveformWidget(QWidget):
         self._cache_offset = 0
 
         # Zoom state
-        self._zoom: float = 1.0       # 1.0 = full view, 2.0 = see half, etc.
-        self._offset: float = 0.0     # 0.0–1.0: scroll position within zoomed view
+        self._zoom: float = 1.0
+        self._offset: float = 0.0
         self._max_zoom: float = 100.0
 
         # Beat grid
         self._grid_enabled = False
         self._grid_bpm = 120.0
         self._grid_beats_per_bar = 4
-        self._grid_subdiv = 1  # subdivisions per beat
+        self._grid_subdiv = 1
         self._grid_offset_ms = 0.0
 
         # Precompute colors
@@ -60,6 +61,15 @@ class WaveformWidget(QWidget):
         self._grid_subdiv = max(1, subdiv)
         self._grid_offset_ms = offset_ms
         self.update()
+
+    def set_scroll_offset(self, offset):
+        """Set offset from external scrollbar (0.0–1.0)."""
+        visible = 1.0 / self._zoom
+        new_off = max(0.0, min(offset, 1.0 - visible))
+        if abs(new_off - self._offset) > 0.0001:
+            self._offset = new_off
+            self._cache = None
+            self.update()
 
     def set_audio(self, data, sr):
         self.audio_data = data
@@ -95,6 +105,7 @@ class WaveformWidget(QWidget):
         self._offset = 0.0
         self._cache = None
         self.update()
+        self.zoom_changed.emit(self._zoom, self._offset)
 
     # ── Zoom coordinate mapping ──
 
@@ -189,6 +200,7 @@ class WaveformWidget(QWidget):
         self._offset = new_offset
         self._cache = None
         self.update()
+        self.zoom_changed.emit(self._zoom, self._offset)
         e.accept()
 
     # ── Paint ──
@@ -224,9 +236,10 @@ class WaveformWidget(QWidget):
             off = int(self._grid_offset_ms * sr / 1000.0)
 
             if sp_sub > 1:
-                bar_pen = QPen(QColor(255, 255, 255, 45), 1)
-                beat_pen = QPen(QColor(255, 255, 255, 22), 1)
-                sub_pen = QPen(QColor(255, 255, 255, 10), 1, Qt.PenStyle.DotLine)
+                # High-visibility grid colors
+                bar_pen = QPen(QColor(255, 255, 255, 80), 1)
+                beat_pen = QPen(QColor(255, 255, 255, 45), 1)
+                sub_pen = QPen(QColor(255, 255, 255, 28), 1)
                 font = QFont("Consolas", 7)
                 p.setFont(font)
 
@@ -234,12 +247,12 @@ class WaveformWidget(QWidget):
                 first_sub = int((adj_vs / sp_sub)) * sp_sub + off
                 if first_sub < vs:
                     first_sub += int(sp_sub)
-                pos_g = first_sub
+                gp = first_sub
 
-                while pos_g <= ve:
-                    x = self._sample_to_x(int(pos_g))
+                while gp <= ve:
+                    x = self._sample_to_x(int(gp))
                     if 0 <= x <= w:
-                        beat_in_song = (pos_g - off) / spb
+                        beat_in_song = (gp - off) / spb
                         bar_num = int(beat_in_song / self._grid_beats_per_bar)
                         beat_in_bar = beat_in_song - bar_num * self._grid_beats_per_bar
                         is_bar = abs(beat_in_bar) < 0.01 or abs(beat_in_bar - self._grid_beats_per_bar) < 0.01
@@ -248,7 +261,7 @@ class WaveformWidget(QWidget):
                         if is_bar:
                             p.setPen(bar_pen)
                             p.drawLine(x, 0, x, h)
-                            p.setPen(QColor(255, 255, 255, 55))
+                            p.setPen(QColor(255, 255, 255, 70))
                             p.drawText(x + 3, 10, str(bar_num + 1))
                         elif is_beat:
                             p.setPen(beat_pen)
@@ -256,7 +269,7 @@ class WaveformWidget(QWidget):
                         else:
                             p.setPen(sub_pen)
                             p.drawLine(x, 0, x, h)
-                    pos_g += sp_sub
+                    gp += sp_sub
 
         # Clip highlight (green, dashed)
         if self._clip_hl_start is not None and self._clip_hl_end is not None:

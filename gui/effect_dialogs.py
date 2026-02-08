@@ -544,7 +544,7 @@ class AutotuneDialog(_Base):
 
 class RobotDialog(_Base):
     def __init__(self, p=None):
-        super().__init__("Robot / Théa", p)
+        super().__init__("Robotic Voice", p)
         self.gr = _slider_int(self._lo, "Grain size (ms)", 3, 50, 8, " ms")
         self.am = _slider_float(self._lo, "Robot amount", 0.0, 1.0, 0.7, 0.05, 2)
         self.mt = _slider_float(self._lo, "Metallic", 0.0, 1.0, 0.4, 0.05, 2)

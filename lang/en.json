@@ -135,7 +135,7 @@
   "cat.autotune.name": "Autotune",
   "cat.autotune.short": "Pitch correction — soft to hard T-Pain snap",
   "cat.autotune.detail": "Corrects pitch to the nearest note in the selected key and scale. Low speed = subtle natural correction. High speed = hard snap (T-Pain / hyperpop style). Essential for digicore vocals.",
-  "cat.robot.name": "Robot / Théa",
+  "cat.robot.name": "Robotic Voice",
   "cat.robot.short": "Robotic granular digital voice",
   "cat.robot.detail": "Granular resynthesis with metallic ring modulation and digital noise. Creates robotic, glitchy, digital vocal textures. Monotone mode flattens pitch to a single note. Small grains = more robotic.",
   "cat.vocal_chop.name": "Vocal Chop",

@@ -1,6 +1,6 @@
 """
-Main window — Glitch Maker v2.2
-Plugin-based effects, global effects system, blue anchor cursor.
+Main window — Glitch Maker v3.9
+Plugin-based effects, global effects system, metronome, beat grid.
 """
 
 import os
@@ -8,7 +8,7 @@ import numpy as np
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QFileDialog, QMessageBox, QPushButton, QLabel, QApplication,
-    QMenu, QSpinBox, QSlider, QDialog, QCheckBox, QFrame
+    QMenu, QSpinBox, QSlider, QDialog, QCheckBox, QScrollBar
 )
 from PyQt6.QtCore import Qt, QTimer, QThread, pyqtSignal as Signal
 from PyQt6.QtGui import QAction, QDragEnterEvent, QDropEvent, QShortcut, QKeySequence
@@ -194,20 +194,18 @@ class MainWindow(QMainWindow):
                 f" font-size: 10px; padding: 0 8px; }}"
                 f"QPushButton:hover {{ background: {COLORS['button_hover']}; border-color: {COLORS['accent']}; }}"
                 f"QPushButton:checked {{ background: {COLORS['accent']}; color: white; border-color: {COLORS['accent']}; }}")
-
-        # ── Metronome toggle ──
-        self.btn_metro = QPushButton("Metronome"); self.btn_metro.setFixedHeight(26)
-        self.btn_metro.setCheckable(True); self.btn_metro.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_metro.setStyleSheet(_tss)
-        self.btn_metro.clicked.connect(self._toggle_metronome)
-        tlo.addWidget(self.btn_metro)
-
-        # ── BPM: [-] spinner [+] ──
         _small = (f"QPushButton {{ background: {COLORS['button_bg']}; color: {COLORS['text']};"
                   f" border: 1px solid {COLORS['border']}; border-radius: 3px;"
                   f" font-size: 12px; font-weight: bold; padding: 0; }}"
                   f"QPushButton:hover {{ background: {COLORS['accent']}; color: white; }}")
 
+        # Metronome toggle
+        self.btn_metro = QPushButton("Metronome"); self.btn_metro.setFixedHeight(26)
+        self.btn_metro.setCheckable(True); self.btn_metro.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_metro.setStyleSheet(_tss); self.btn_metro.clicked.connect(self._toggle_metronome)
+        tlo.addWidget(self.btn_metro)
+
+        # BPM: [-] spinner [+]
         self.btn_bpm_minus = QPushButton("-"); self.btn_bpm_minus.setFixedSize(22, 26)
         self.btn_bpm_minus.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_bpm_minus.setStyleSheet(_small)
@@ -235,10 +233,10 @@ class MainWindow(QMainWindow):
 
         tlo.addSpacing(4)
 
-        # ── Grid dropdown ──
+        # Grid dropdown
         self.btn_grid = QPushButton("Grid: Off"); self.btn_grid.setFixedHeight(26)
         self.btn_grid.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_grid.setStyleSheet(_tss.replace(":checked", ":menu-indicator"))  # no check style needed
+        self.btn_grid.setStyleSheet(_tss)
         self.btn_grid.clicked.connect(self._show_grid_menu)
         tlo.addWidget(self.btn_grid)
 
@@ -247,6 +245,30 @@ class MainWindow(QMainWindow):
         # Waveform
         self.waveform = WaveformWidget()
         rl.addWidget(self.waveform, stretch=3)
+
+        # Horizontal scroll bar (visible when zoomed)
+        self.wave_scrollbar = QScrollBar(Qt.Orientation.Horizontal)
+        self.wave_scrollbar.setFixedHeight(12)
+        self.wave_scrollbar.setVisible(False)
+        self.wave_scrollbar.setStyleSheet(f"""
+            QScrollBar:horizontal {{
+                background: {COLORS['bg_dark']}; height: 12px;
+                border: none; border-radius: 0px;
+            }}
+            QScrollBar::handle:horizontal {{
+                background: {COLORS['accent']}; min-width: 30px;
+                border-radius: 4px; margin: 2px 0;
+            }}
+            QScrollBar::handle:horizontal:hover {{ background: {COLORS['accent_hover']}; }}
+            QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {{
+                width: 0; height: 0;
+            }}
+            QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal {{
+                background: {COLORS['bg_dark']};
+            }}
+        """)
+        self.wave_scrollbar.valueChanged.connect(self._on_wave_scroll)
+        rl.addWidget(self.wave_scrollbar)
 
         # Timeline
         self.timeline_w = TimelineWidget(self.timeline)
@@ -297,7 +319,7 @@ class MainWindow(QMainWindow):
         self._menu_action(om, t("menu.options.language"), "", self._settings_language)
         om.addSeparator()
         self._menu_action(om, "Metronome Settings...", "", self._open_metronome_dialog)
-        self._menu_action(om, "Grid Settings...", "", self._show_grid_menu)
+        self._menu_action(om, "Grid...", "", self._show_grid_menu)
         om.addSeparator()
         self._menu_action(om, t("menu.options.select_all"), "Ctrl+A", self._select_all)
         om.addSeparator()
@@ -349,6 +371,7 @@ class MainWindow(QMainWindow):
         self.waveform.position_clicked.connect(self._seek)
         self.waveform.selection_changed.connect(self._on_sel)
         self.waveform.drag_started.connect(self._on_drag_start)
+        self.waveform.zoom_changed.connect(self._on_waveform_zoom)
         self.effects_panel.effect_clicked.connect(self._on_effect)
         self.effects_panel.catalog_clicked.connect(self._catalog)
         self.effects_panel.import_clicked.connect(self._import_effect)
@@ -375,6 +398,29 @@ class MainWindow(QMainWindow):
             self.toolbar_info.setText("")
         self.btn_redo.setText("Redo  (Ctrl+Y)")
 
+    # ══════ Waveform Scroll ══════
+
+    def _on_waveform_zoom(self, zoom, offset):
+        """Update scrollbar when waveform zoom/offset changes."""
+        if zoom <= 1.01:
+            self.wave_scrollbar.setVisible(False)
+            return
+        self.wave_scrollbar.setVisible(True)
+        visible_frac = 1.0 / zoom
+        # Scrollbar range: 0 to 10000 for precision
+        max_val = 10000
+        page = int(visible_frac * max_val)
+        self.wave_scrollbar.blockSignals(True)
+        self.wave_scrollbar.setRange(0, max_val - page)
+        self.wave_scrollbar.setPageStep(page)
+        self.wave_scrollbar.setValue(int(offset * max_val))
+        self.wave_scrollbar.blockSignals(False)
+
+    def _on_wave_scroll(self, value):
+        """Scrollbar dragged — update waveform offset."""
+        offset = value / 10000.0
+        self.waveform.set_scroll_offset(offset)
+
     # ══════ Metronome & Grid ══════
 
     def _toggle_metronome(self):
@@ -398,74 +444,40 @@ class MainWindow(QMainWindow):
             QMenu::item:selected {{ background: {COLORS['accent']}; color: white; }}
             QMenu::separator {{ height: 1px; background: {COLORS['border']}; margin: 3px 8px; }}
         """)
-        # (label, subdiv_per_beat)  — 0 = off
         opts = [
-            ("Off", 0),
-            None,
-            ("Bar", -1),
-            ("Beat", 1),
-            None,
-            ("1/2 step", 2),
-            ("1/3 step", 3),
-            ("1/4 step", 4),
-            ("1/6 step", 6),
-            ("1/8 step", 8),
-            None,
-            ("1/2 beat", 2),
-            ("1/3 beat", 3),
-            ("1/4 beat", 4),
+            ("Off", 0), None,
+            ("Bar", -1), ("Beat", 1), None,
+            ("1/2", 2), ("1/3", 3), ("1/4", 4),
+            ("1/6", 6), ("1/8", 8), ("1/12", 12), ("1/16", 16),
         ]
-        # Deduplicate — FL has "step" (subdiv of beat) and "beat" (same thing)
-        # Simplify: just show all useful subdivisions
-        final_opts = [
-            ("Off", 0),
-            None,
-            ("Bar", -1),
-            ("Beat", 1),
-            None,
-            ("1/2", 2),
-            ("1/3", 3),
-            ("1/4", 4),
-            ("1/6", 6),
-            ("1/8", 8),
-            ("1/12", 12),
-            ("1/16", 16),
-        ]
-        for opt in final_opts:
+        for opt in opts:
             if opt is None:
                 menu.addSeparator(); continue
             label, subdiv = opt
             a = menu.addAction(label)
             a.triggered.connect(lambda _, l=label, s=subdiv: self._set_grid(l, s))
-
         pos = self.btn_grid.mapToGlobal(self.btn_grid.rect().bottomLeft())
         menu.exec(pos)
 
     def _set_grid(self, label, subdiv):
         if subdiv == 0:
             self.waveform.set_grid(False)
-            self.btn_grid.setText("Grid: Off")
-            return
+            self.btn_grid.setText("Grid: Off"); return
         bpm = self.bpm_spin.value()
         beats = self.playback.metronome.beats_per_bar
-        real_subdiv = 1 if subdiv == -1 else subdiv
-        # For "Bar" mode: we set subdiv=1 and beats_per_bar=beats (shows only bar lines)
-        if subdiv == -1:
+        if subdiv == -1:  # Bar mode
             self.waveform.set_grid(True, bpm, beats, 1)
-            # Hack: for bar-only, set subdiv to a fraction that only hits bars
-            # Actually easier: just set beats_per_bar=1 for drawing
             self.waveform._grid_beats_per_bar = 1
             self.waveform._grid_subdiv = 1
             self.waveform.update()
         else:
-            self.waveform.set_grid(True, bpm, beats, real_subdiv)
+            self.waveform.set_grid(True, bpm, beats, subdiv)
         self.btn_grid.setText(f"Grid: {label}")
 
     def _open_metronome_dialog(self):
         metro = self.playback.metronome
         dlg = QDialog(self)
-        dlg.setWindowTitle("Metronome Settings")
-        dlg.setFixedWidth(300)
+        dlg.setWindowTitle("Metronome Settings"); dlg.setFixedWidth(300)
         dlg.setStyleSheet(f"""
             QDialog {{ background: {COLORS['bg_panel']}; color: {COLORS['text']}; }}
             QLabel {{ color: {COLORS['text']}; font-size: 11px; }}
@@ -482,8 +494,7 @@ class MainWindow(QMainWindow):
         """)
         lo = QVBoxLayout(dlg); lo.setSpacing(8); lo.setContentsMargins(16, 12, 16, 12)
 
-        chk = QCheckBox("Enabled"); chk.setChecked(metro.enabled)
-        lo.addWidget(chk)
+        chk = QCheckBox("Enabled"); chk.setChecked(metro.enabled); lo.addWidget(chk)
 
         r1 = QHBoxLayout(); r1.addWidget(QLabel("BPM"))
         bpm_s = QSpinBox(); bpm_s.setRange(20, 300); bpm_s.setValue(int(metro.bpm))
@@ -500,14 +511,14 @@ class MainWindow(QMainWindow):
         vol_sl.valueChanged.connect(lambda v: vol_lbl.setText(f"{v}%"))
         r3.addWidget(vol_sl, stretch=1); r3.addWidget(vol_lbl); lo.addLayout(r3)
 
-        btns = QHBoxLayout()
+        btns = QHBoxLayout(); btns.addStretch()
         for txt, slot in [("Cancel", dlg.reject), ("OK", dlg.accept)]:
             b = QPushButton(txt); b.setFixedHeight(28)
             b.setStyleSheet(f"QPushButton {{ background: {COLORS['button_bg']}; color: {COLORS['text']};"
                             f" border: 1px solid {COLORS['border']}; border-radius: 4px; padding: 0 16px; }}"
                             f"QPushButton:hover {{ background: {COLORS['accent']}; color: white; }}")
             b.clicked.connect(slot); btns.addWidget(b)
-        btns.insertStretch(0); lo.addLayout(btns)
+        lo.addLayout(btns)
 
         if dlg.exec() == QDialog.DialogCode.Accepted:
             metro.enabled = chk.isChecked()

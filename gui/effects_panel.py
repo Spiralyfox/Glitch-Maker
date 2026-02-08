@@ -153,7 +153,7 @@ class CollapsibleSection(QWidget):
         self._update_header()
 
 
-# ═══ Preset Item (compact — colored dot, tooltip, hover accent) ═══
+# ═══ Preset Item ═══
 
 _TAG_COLORS = {
     "Autotune": "#f72585", "Hyperpop": "#ff006e", "Digicore": "#7209b7",
