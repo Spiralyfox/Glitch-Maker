@@ -15,6 +15,9 @@ import sys
 import json
 import importlib.util
 import traceback
+import logging
+
+log = logging.getLogger(__name__)
 
 # Resolve user plugins directory (works both normal and frozen)
 if getattr(sys, 'frozen', False):
@@ -52,8 +55,8 @@ def _load_registry() -> list:
         try:
             with open(_REGISTRY_PATH, "r", encoding="utf-8") as f:
                 return json.load(f)
-        except Exception:
-            pass
+        except Exception as e:
+            log.debug("ignored: %s", e)
     return []
 
 
@@ -280,8 +283,8 @@ def load_user_plugins() -> dict:
                     try:
                         with open(jp, "r", encoding="utf-8") as f:
                             _user_translations[pid] = json.load(f)
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        log.debug("ignored: %s", e)
 
             # Create wrapper function
             def _make_wrapper(fn):

@@ -1,8 +1,11 @@
 """Configuration & constants for Glitch Maker."""
 import os, json
+import logging
+
+log = logging.getLogger(__name__)
 
 APP_NAME = "Glitch Maker"
-APP_VERSION = "3.10"
+APP_VERSION = "3.10.1"
 WINDOW_MIN_WIDTH = 1050
 WINDOW_MIN_HEIGHT = 650
 RECORDING_SAMPLE_RATE = 44100
@@ -46,5 +49,5 @@ def save_settings(s: dict):
     try:
         with open(_SETTINGS_PATH, "w", encoding="utf-8") as f:
             json.dump(s, f, indent=2)
-    except Exception:
-        pass
+    except Exception as e:
+        log.debug("ignored: %s", e)

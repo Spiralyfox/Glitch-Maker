@@ -10,6 +10,9 @@ from PyQt6.QtCore import Qt, QThread, QTimer, pyqtSignal
 from PyQt6.QtGui import QFont
 from utils.config import COLORS
 import numpy as np
+import logging
+
+log = logging.getLogger(__name__)
 
 _SS = f"""
 QDialog {{ background: {COLORS['bg_medium']}; }}
@@ -206,10 +209,10 @@ class _Base(QDialog):
             self._pv_timer.stop()
         try:
             import sounddevice as sd; sd.stop()
-        except Exception: pass
+        except Exception as e: log.debug("ignored: %s", e)
         if self._pv_worker is not None:
             try: self._pv_worker.quit(); self._pv_worker.wait(500)
-            except: pass
+            except Exception as e: log.debug("preview cleanup: %s", e)
             self._pv_worker = None
         self._pv_btn.setText("▶ Preview"); self._pv_btn.setEnabled(True)
 
@@ -275,12 +278,16 @@ class PitchShiftDialog(_Base):
         """Initialise les sliders de parametres pour PitchShift."""
         super().__init__("Pitch Shift", p)
         self.st = _slider_float(self._lo, "Semitones", -24, 24, 0, 1, 1, " st", 10)
-        self.simple = QCheckBox("Simple mode (faster)"); self._lo.addWidget(self.simple)
+        self.pf = QCheckBox("Preserve Formants (anti-chipmunk)"); self._lo.addWidget(self.pf)
+        self.simple = QCheckBox("Simple mode (faster, changes duration)"); self._lo.addWidget(self.simple)
         self._finish()
     """Retourne les parametres actuels sous forme de dict."""
-    def get_params(self): return {"semitones": self.st.value(), "simple": self.simple.isChecked()}
+    def get_params(self): return {"semitones": self.st.value(), "simple": self.simple.isChecked(),
+                                  "preserve_formants": self.pf.isChecked()}
     """Charge les parametres depuis un dict."""
-    def set_params(self, p): self.st.setValue(p.get("semitones", 0)); self.simple.setChecked(p.get("simple", False))
+    def set_params(self, p):
+        self.st.setValue(p.get("semitones", 0)); self.simple.setChecked(p.get("simple", False))
+        self.pf.setChecked(p.get("preserve_formants", False))
 
 class TimeStretchDialog(_Base):
     def __init__(self, p=None):
@@ -418,15 +425,32 @@ class DelayDialog(_Base):
     def __init__(self, p=None):
         """Initialise les sliders de parametres pour Delay."""
         super().__init__("Delay", p)
-        self.d = _slider_int(self._lo, "Delay (ms)", 10, 2000, 300, " ms")
+        self._row("Mode"); self.md = QComboBox(); self.md.addItems(["normal", "ping_pong"]); self._lo.addWidget(self.md)
+        self.d = _slider_int(self._lo, "Delay (ms) — manual", 10, 2000, 300, " ms")
+        self.bpm = _slider_int(self._lo, "Sync BPM (0=off)", 0, 300, 0, " BPM")
+        self._row("Sync Note"); self.note = QComboBox()
+        self.note.addItems(["1/1", "1/2", "1/2d", "1/4", "1/4d", "1/4t",
+                            "1/8", "1/8d", "1/8t", "1/16", "1/16d", "1/16t", "1/32"])
+        self.note.setCurrentText("1/4"); self._lo.addWidget(self.note)
         self.fb = _slider_float(self._lo, "Feedback", 0, 0.95, 0.4, 0.05, 2)
+        self.ft = _slider_float(self._lo, "Filter Tone (0=dark, 1=bright)", 0, 1, 1.0, 0.05, 2)
         self.mx = _slider_float(self._lo, "Mix", 0, 1, 0.5, 0.1, 2)
         self._finish()
-    """Retourne les parametres actuels sous forme de dict."""
-    def get_params(self): return {"delay_ms": self.d.value(), "feedback": self.fb.value(), "mix": self.mx.value()}
+    def get_params(self):
+        """Retourne les parametres actuels sous forme de dict."""
+        return {"delay_ms": self.d.value(), "feedback": self.fb.value(), "mix": self.mx.value(),
+                "mode": self.md.currentText(), "sync_bpm": float(self.bpm.value()),
+                "sync_note": self.note.currentText(), "filter_tone": self.ft.value()}
     def set_params(self, p):
         """Charge les parametres depuis un dict."""
-        self.d.setValue(int(p.get("delay_ms", 300))); self.fb.setValue(p.get("feedback", 0.4)); self.mx.setValue(p.get("mix", 0.5))
+        self.d.setValue(int(p.get("delay_ms", 300))); self.fb.setValue(p.get("feedback", 0.4))
+        self.mx.setValue(p.get("mix", 0.5))
+        idx = self.md.findText(p.get("mode", "normal"))
+        if idx >= 0: self.md.setCurrentIndex(idx)
+        self.bpm.setValue(int(p.get("sync_bpm", 0)))
+        idx = self.note.findText(p.get("sync_note", "1/4"))
+        if idx >= 0: self.note.setCurrentIndex(idx)
+        self.ft.setValue(p.get("filter_tone", 1.0))
 
 class VinylDialog(_Base):
     def __init__(self, p=None):
@@ -613,12 +637,15 @@ class AutotuneDialog(_Base):
         self.scale = QComboBox()
         self.scale.addItems(["chromatic", "major", "minor", "pentatonic", "blues", "dorian", "mixolydian"])
         self._lo.addWidget(self.scale)
+        self.fs = _slider_float(self._lo, "Formant Shift (st)", -12.0, 12.0, 0.0, 0.5, 1, " st", 10)
+        self.ht = QCheckBox("Hard Tune (100 gecs / T-Pain extreme)"); self._lo.addWidget(self.ht)
         self.mx = _slider_float(self._lo, "Mix", 0.0, 1.0, 1.0, 0.05, 2)
         self._finish()
     def get_params(self):
         """Retourne les parametres actuels sous forme de dict."""
         return {"speed": self.sp.value(), "key": self.key.currentText(),
-                "scale": self.scale.currentText(), "mix": self.mx.value()}
+                "scale": self.scale.currentText(), "mix": self.mx.value(),
+                "formant_shift": self.fs.value(), "hard_tune": self.ht.isChecked()}
     def set_params(self, p):
         """Charge les parametres depuis un dict."""
         self.sp.setValue(p.get("speed", 0.8))
@@ -627,6 +654,8 @@ class AutotuneDialog(_Base):
         idx = self.scale.findText(p.get("scale", "chromatic"))
         if idx >= 0: self.scale.setCurrentIndex(idx)
         self.mx.setValue(p.get("mix", 1.0))
+        self.fs.setValue(p.get("formant_shift", 0.0))
+        self.ht.setChecked(p.get("hard_tune", False))
 
 
 # ─── New: Space & Texture ───

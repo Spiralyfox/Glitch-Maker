@@ -1,5 +1,5 @@
 """
-Main window — Glitch Maker v3.10
+Main window — Glitch Maker v3.10.1
 Plugin-based effects, global effects system, metronome, beat grid.
 """
 
@@ -39,6 +39,9 @@ from utils.config import (
     AUDIO_EXTENSIONS, ALL_EXTENSIONS, load_settings, save_settings
 )
 from utils.translator import t, set_language, get_language
+import logging
+
+log = logging.getLogger(__name__)
 
 
 # ═══ Background worker for heavy operations ═══
@@ -859,8 +862,8 @@ class MainWindow(QMainWindow):
         if is_global and effect_id in self._global_effects:
             try:
                 d.set_params(self._global_effects[effect_id])
-            except Exception:
-                pass
+            except Exception as e:
+                log.debug("ignored: %s", e)
 
         accepted = d.exec() == d.DialogCode.Accepted
 
@@ -956,8 +959,8 @@ class MainWindow(QMainWindow):
                             before_b, after_b = self._base_audio[:s], self._base_audio[e:]
                             parts_b = [p for p in [before_b, mod_b, after_b] if len(p) > 0]
                             self._base_audio = np.concatenate(parts_b, axis=0).astype(np.float32)
-                except Exception:
-                    pass
+                except Exception as e:
+                    log.debug("ignored: %s", e)
             self._update_clips_from_audio()
             self._refresh_all()
             self._unsaved = True

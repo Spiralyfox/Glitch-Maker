@@ -1,6 +1,22 @@
 # Glitch Maker — Statut du projet
 
-## v3.10 — Release actuelle
+## v3.10.1 — Release actuelle
+
+### Correctifs & Stabilite
+- **Thread safety** : `threading.Lock` sur playback (position, is_playing) — elimine les race conditions
+- **Audio overflow** : `np.clip(-1, 1)` ajoute a 10 effets (bitcrusher, buffer_freeze, granular, reverse, shuffle, stutter, tape_stop, time_stretch, tremolo, volume)
+- **Exception handling** : 0 bare `except:`, 0 `except...pass` — tout est logue via `logging`
+- **Performance** : filtre tone de Distortion remplace par `scipy.signal.lfilter` (100x plus rapide)
+- **Tag Nightcore** : couleur ajoutee dans `_TAG_COLORS`
+
+### Ameliorations d'effets
+- **Autotune** : nouveau parametre **Formant Shift** (-12 a +12 st) — voix anime (+5) ou grave (-5) sans changer le pitch ; mode **Hard Tune** (snap instantane style 100 gecs / T-Pain extreme, fenetres plus petites)
+- **Pitch Shift** : option **Preserve Formants** — compense le decalage des formants pour eviter l'effet chipmunk
+- **Delay** : mode **Ping-Pong** (echos alternent L/R) ; **Sync BPM** (1/1 a 1/32 avec dotted et triplet) ; **Filter Tone** (filtre passe-bas dans la boucle de feedback, echos qui s'assombrissent)
+
+---
+
+## v3.10
 
 ### Phase 1 : Fondations [COMPLETE]
 - GUI PyQt6 theme sombre digicore

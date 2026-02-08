@@ -172,7 +172,7 @@ _TAG_COLORS = {
     "Experimental": "#b5179e", "Electro": "#0ea5e9", "Tape": "#6b705c",
     "Clean": "#16c79a", "Subtle": "#457b9d", "Dariacore": "#c74b50",
     "Rhythmic": "#e07c24", "Psychedelic": "#6d597a", "Bass": "#264653",
-    "Cinematic": "#3d5a80",
+    "Cinematic": "#3d5a80", "Nightcore": "#ff69b4",
 }
 
 

@@ -1,5 +1,8 @@
 """Translation system — loads lang JSON, provides t() function."""
 import json, os, sys
+import logging
+
+log = logging.getLogger(__name__)
 
 _strings: dict = {}
 _lang: str = "en"
@@ -38,7 +41,7 @@ def t(key: str, **kw) -> str:
         return key.split(".")[-1].replace("_", " ").capitalize()
     if kw:
         try: text = text.format(**kw)
-        except (KeyError, IndexError): pass
+        except (KeyError, IndexError) as e: log.debug("ignored: %s", e)
     return text
 
 set_language("en")

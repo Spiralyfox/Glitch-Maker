@@ -1,5 +1,8 @@
 """Preset manager — built-in + user presets, tag management with cascade delete."""
 import json, os, sys
+import logging
+
+log = logging.getLogger(__name__)
 
 if getattr(sys, 'frozen', False):
     _BASE_DIR = sys._MEIPASS
@@ -59,24 +62,24 @@ class PresetManager:
         try:
             with open(_USER_PATH, "w", encoding="utf-8") as f:
                 json.dump(self._user, f, indent=2)
-        except Exception:
-            pass
+        except Exception as e:
+            log.debug("ignored: %s", e)
 
     def _save_tags(self):
         """Sauvegarde les associations tags/presets."""
         try:
             with open(_USER_TAGS_PATH, "w", encoding="utf-8") as f:
                 json.dump(self._user_tags, f, indent=2)
-        except Exception:
-            pass
+        except Exception as e:
+            log.debug("ignored: %s", e)
 
     def _save_deleted_tags(self):
         """Sauvegarde les presets builtin supprimes."""
         try:
             with open(_DELETED_TAGS_PATH, "w", encoding="utf-8") as f:
                 json.dump(self._deleted_tags, f, indent=2)
-        except Exception:
-            pass
+        except Exception as e:
+            log.debug("ignored: %s", e)
 
     # ── Presets ──
 
