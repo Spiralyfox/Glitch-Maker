@@ -24,7 +24,8 @@ _ffmpeg_cache = None
 _ffmpeg_searched = False
 
 # Directory where we store our own ffmpeg copy
-_FFMPEG_DIR = os.path.join(os.path.expanduser("~"), ".glitchmaker", "ffmpeg")
+from utils.config import get_data_dir as _get_data_dir
+_FFMPEG_DIR = os.path.join(_get_data_dir(), "ffmpeg")
 
 # Static build download URLs (well-known, stable sources)
 _FFMPEG_URLS = {
@@ -44,7 +45,7 @@ def _load_ffmpeg_from_settings():
     """Try loading ffmpeg path from saved settings."""
     global _ffmpeg_cache, _ffmpeg_searched
     try:
-        settings_path = os.path.join(os.path.expanduser("~"), ".glitchmaker_settings.json")
+        settings_path = os.path.join(_get_data_dir(), "settings.json")
         if os.path.isfile(settings_path):
             import json as _json
             with open(settings_path, "r", encoding="utf-8") as f:
@@ -181,7 +182,7 @@ def ffmpeg_available() -> bool:
 
 def download_ffmpeg(progress_cb=None) -> str:
     """
-    Download a static FFmpeg build to ~/.glitchmaker/ffmpeg/.
+    Download a static FFmpeg build to data/ffmpeg/.
     progress_cb(message: str) is called with status updates.
     Returns the path to the ffmpeg binary.
     Raises RuntimeError on failure.

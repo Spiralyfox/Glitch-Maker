@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Glitch Maker — Effect Plugin Example</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #0d0d1a; color: #e0e0e0; font-family: 'Segoe UI', system-ui, sans-serif; line-height: 1.6; padding: 40px 20px; }
+.container { max-width: 900px; margin: 0 auto; }
+h1 { color: #7c5cfc; font-size: 28px; margin-bottom: 8px; }
+h2 { color: #a78bfa; font-size: 20px; margin-top: 36px; margin-bottom: 12px; border-bottom: 1px solid #2a2a4a; padding-bottom: 6px; }
+h3 { color: #c4b5fd; font-size: 16px; margin-top: 24px; margin-bottom: 8px; }
+p { margin-bottom: 12px; }
+code { background: #1a1a30; padding: 2px 6px; border-radius: 3px; font-family: 'Cascadia Code', 'Consolas', monospace; font-size: 13px; color: #a78bfa; }
+pre { background: #0f0f22; border: 1px solid #2a2a4a; border-radius: 8px; padding: 16px 20px; overflow-x: auto; margin: 12px 0 20px 0; font-family: 'Cascadia Code', 'Consolas', monospace; font-size: 13px; line-height: 1.5; }
+.comment { color: #6b7280; }
+.keyword { color: #c084fc; }
+.string { color: #34d399; }
+.number { color: #fbbf24; }
+.func { color: #60a5fa; }
+.cls { color: #f472b6; }
+.tip { background: #1a1a30; border-left: 4px solid #7c5cfc; padding: 12px 16px; border-radius: 0 8px 8px 0; margin: 16px 0; }
+.warn { background: #1a1020; border-left: 4px solid #f59e0b; padding: 12px 16px; border-radius: 0 8px 8px 0; margin: 16px 0; }
+.section { background: #111125; border: 1px solid #2a2a4a; border-radius: 10px; padding: 24px; margin: 20px 0; }
+.lang-toggle { display: flex; gap: 8px; margin-bottom: 24px; }
+.lang-btn { padding: 8px 24px; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; }
+.lang-btn.active { background: #7c5cfc; color: white; }
+.lang-btn.inactive { background: #2a2a4a; color: #999; }
+.filename { display: inline-block; background: #7c5cfc; color: white; padding: 4px 12px; border-radius: 4px 4px 0 0; font-size: 12px; font-weight: bold; margin-bottom: -1px; }
+table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+th { background: #1a1a30; color: #a78bfa; text-align: left; padding: 8px 12px; border: 1px solid #2a2a4a; }
+td { padding: 8px 12px; border: 1px solid #2a2a4a; }
+footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid #2a2a4a; color: #666; font-size: 12px; text-align: center; }
+a { color: #7c5cfc; }
+.fr { display: none; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<div class="lang-toggle">
+    <button class="lang-btn active" id="btn-en" onclick="setLang('en')">English</button>
+    <button class="lang-btn inactive" id="btn-fr" onclick="setLang('fr')">Français</button>
+</div>
+
+<!-- ═══════════════════ ENGLISH ═══════════════════ -->
+
+<div class="en">
+<h1>How to Create a Custom Effect Plugin</h1>
+<p>This guide shows you how to create a custom audio effect for Glitch Maker. Each effect is a single <code>.py</code> file with an optional <code>_lang.json</code> translation file.</p>
+
+<div class="section">
+<h2>File Structure</h2>
+<p>Your effect file needs 3 parts:</p>
+<table>
+<tr><th>Part</th><th>Purpose</th><th>Required?</th></tr>
+<tr><td><b>Metadata</b></td><td>Effect ID, icon, color, category</td><td>Yes</td></tr>
+<tr><td><b>Dialog class</b></td><td>UI for parameter controls (sliders, combos, etc.)</td><td>Yes</td></tr>
+<tr><td><b>process() function</b></td><td>The actual audio processing (DSP)</td><td>Yes</td></tr>
+</table>
+<p>Optionally, a <code>_lang.json</code> file provides bilingual name/description for the catalog.</p>
+</div>
+
+<div class="section">
+<h2>Complete Example: Tremolo Effect</h2>
+<p>This is a real effect from Glitch Maker — a tremolo that modulates volume at a configurable rate.</p>
+
+<span class="filename">effect_tremolo.py</span>
+<pre><span class="comment"># ══════════════════════════════════════════════════
+# Effect Metadata
+# ══════════════════════════════════════════════════</span>
+EFFECT_ID      = <span class="string">"tremolo"</span>           <span class="comment"># Unique ID (lowercase, no spaces)</span>
+EFFECT_ICON    = <span class="string">"~"</span>                 <span class="comment"># Single character for the icon</span>
+EFFECT_COLOR   = <span class="string">"#e07c24"</span>           <span class="comment"># Hex color for the button</span>
+EFFECT_SECTION = <span class="string">"Modulation"</span>        <span class="comment"># Category: Basics, Pitch, Distortion,
+                                     #   Modulation, Space, Glitch, Custom</span>
+
+<span class="comment"># ══════════════════════════════════════════════════
+# Dialog (UI for parameters)
+# ══════════════════════════════════════════════════</span>
+<span class="keyword">import</span> numpy <span class="keyword">as</span> np
+<span class="keyword">from</span> PyQt6.QtWidgets <span class="keyword">import</span> QLabel, QComboBox
+<span class="keyword">from</span> gui.effect_dialogs <span class="keyword">import</span> _Base, _slider_float
+
+<span class="keyword">class</span> <span class="cls">Dialog</span>(_Base):
+    <span class="keyword">def</span> <span class="func">__init__</span>(self, p=<span class="keyword">None</span>):
+        <span class="func">super</span>().__init__(<span class="string">"Tremolo"</span>, p)
+        <span class="comment"># _slider_float(layout, label, min, max, default, step, decimals, suffix, multiplier)</span>
+        self.rt = <span class="func">_slider_float</span>(self._lo, <span class="string">"Rate (Hz)"</span>, <span class="number">0.1</span>, <span class="number">30</span>, <span class="number">5</span>, <span class="number">0.5</span>, <span class="number">1</span>, <span class="string">" Hz"</span>, <span class="number">10</span>)
+        self.dp = <span class="func">_slider_float</span>(self._lo, <span class="string">"Depth"</span>, <span class="number">0</span>, <span class="number">1</span>, <span class="number">0.7</span>, <span class="number">0.1</span>, <span class="number">2</span>)
+        self._row(<span class="string">"Shape"</span>)
+        self.sh = QComboBox()
+        self.sh.addItems([<span class="string">"sine"</span>, <span class="string">"square"</span>, <span class="string">"triangle"</span>, <span class="string">"saw"</span>])
+        self._lo.addWidget(self.sh)
+        self._finish()     <span class="comment"># Always call _finish() at the end!</span>
+
+    <span class="keyword">def</span> <span class="func">get_params</span>(self):
+        <span class="keyword">return</span> {
+            <span class="string">"rate_hz"</span>: self.rt.value(),
+            <span class="string">"depth"</span>: self.dp.value(),
+            <span class="string">"shape"</span>: self.sh.currentText()
+        }
+
+    <span class="keyword">def</span> <span class="func">set_params</span>(self, p):
+        self.rt.setValue(p.get(<span class="string">"rate_hz"</span>, <span class="number">5</span>))
+        self.dp.setValue(p.get(<span class="string">"depth"</span>, <span class="number">0.7</span>))
+        idx = self.sh.findText(p.get(<span class="string">"shape"</span>, <span class="string">"sine"</span>))
+        <span class="keyword">if</span> idx >= <span class="number">0</span>: self.sh.setCurrentIndex(idx)
+
+<span class="comment"># ══════════════════════════════════════════════════
+# DSP / Process
+# ══════════════════════════════════════════════════</span>
+
+<span class="keyword">def</span> <span class="func">process</span>(audio_data, start, end, sr=<span class="number">44100</span>, **kw):
+    <span class="comment">"""Main processing function. MUST return a numpy array of the same shape."""</span>
+    out = audio_data.copy()
+    seg = out[start:end].astype(np.float64)
+    n = len(seg)
+
+    <span class="comment"># Read parameters from kw (same keys as get_params)</span>
+    rate_hz = kw.get(<span class="string">"rate_hz"</span>, <span class="number">5.0</span>)
+    depth   = kw.get(<span class="string">"depth"</span>, <span class="number">0.7</span>)
+    shape   = kw.get(<span class="string">"shape"</span>, <span class="string">"sine"</span>)
+
+    <span class="comment"># Generate LFO (Low Frequency Oscillator)</span>
+    t_arr = np.arange(n, dtype=np.float64) / sr
+    <span class="keyword">if</span> shape == <span class="string">"sine"</span>:
+        lfo = <span class="number">0.5</span> * (<span class="number">1.0</span> + np.sin(<span class="number">2.0</span> * np.pi * rate_hz * t_arr))
+    <span class="keyword">elif</span> shape == <span class="string">"square"</span>:
+        lfo = (np.sin(<span class="number">2.0</span> * np.pi * rate_hz * t_arr) >= <span class="number">0</span>).astype(np.float64)
+    <span class="keyword">elif</span> shape == <span class="string">"triangle"</span>:
+        lfo = <span class="number">2.0</span> * np.abs(<span class="number">2.0</span> * (rate_hz * t_arr - np.floor(rate_hz * t_arr + <span class="number">0.5</span>)))
+    <span class="keyword">else</span>:
+        lfo = np.mod(rate_hz * t_arr, <span class="number">1.0</span>)
+
+    <span class="comment"># Apply tremolo envelope</span>
+    envelope = <span class="number">1.0</span> - depth * (<span class="number">1.0</span> - lfo)
+    <span class="keyword">if</span> seg.ndim == <span class="number">2</span>:
+        envelope = envelope.reshape(-<span class="number">1</span>, <span class="number">1</span>)   <span class="comment"># Stereo: broadcast to both channels</span>
+    out[start:end] = (seg * envelope).astype(np.float32)
+    <span class="keyword">return</span> out</pre>
+
+<span class="filename">effect_tremolo_lang.json</span>
+<pre>{
+  <span class="string">"en"</span>: {
+    <span class="string">"name"</span>: <span class="string">"Tremolo"</span>,
+    <span class="string">"short"</span>: <span class="string">"Rhythmic volume wobble"</span>,
+    <span class="string">"detail"</span>: <span class="string">"Modulates volume up and down at a set rate."</span>
+  },
+  <span class="string">"fr"</span>: {
+    <span class="string">"name"</span>: <span class="string">"Tremolo"</span>,
+    <span class="string">"short"</span>: <span class="string">"Oscillation rythmique du volume"</span>,
+    <span class="string">"detail"</span>: <span class="string">"Module le volume de haut en bas à un rythme défini."</span>
+  }
+}</pre>
+</div>
+
+<div class="section">
+<h2>Metadata Reference</h2>
+<table>
+<tr><th>Variable</th><th>Type</th><th>Description</th></tr>
+<tr><td><code>EFFECT_ID</code></td><td>string</td><td>Unique identifier, lowercase, no spaces (e.g. <code>"my_effect"</code>)</td></tr>
+<tr><td><code>EFFECT_ICON</code></td><td>string</td><td>Single character displayed in the effect button (e.g. <code>"T"</code>)</td></tr>
+<tr><td><code>EFFECT_COLOR</code></td><td>string</td><td>Hex color for the effect button (e.g. <code>"#e07c24"</code>)</td></tr>
+<tr><td><code>EFFECT_SECTION</code></td><td>string</td><td>Category: <code>Basics</code>, <code>Pitch</code>, <code>Distortion</code>, <code>Modulation</code>, <code>Space</code>, <code>Glitch</code>, or <code>Custom</code></td></tr>
+</table>
+</div>
+
+<div class="section">
+<h2>Dialog Class Rules</h2>
+<ul style="margin-left: 20px;">
+<li>Must be named <code>Dialog</code> and inherit from <code>_Base</code></li>
+<li><code>__init__(self, p=None)</code> — call <code>super().__init__("Title", p)</code> then add widgets, then <code>self._finish()</code></li>
+<li><code>get_params(self)</code> — return a dict of parameter values</li>
+<li><code>set_params(self, p)</code> — restore parameters from a dict</li>
+</ul>
+<h3>Available slider helpers</h3>
+<table>
+<tr><th>Function</th><th>Usage</th></tr>
+<tr><td><code>_slider_int(layout, label, min, max, default)</code></td><td>Integer slider</td></tr>
+<tr><td><code>_slider_float(layout, label, min, max, default, step, decimals, suffix, multiplier)</code></td><td>Float slider</td></tr>
+</table>
+<p>You can also add any PyQt6 widget (QComboBox, QCheckBox, etc.) directly to <code>self._lo</code>.</p>
+</div>
+
+<div class="section">
+<h2>process() Function Rules</h2>
+<div class="tip">
+<b>Signature:</b> <code>def process(audio_data, start, end, sr=44100, **kw)</code>
+</div>
+<table>
+<tr><th>Parameter</th><th>Type</th><th>Description</th></tr>
+<tr><td><code>audio_data</code></td><td>numpy array</td><td>Full audio (1D mono or 2D stereo). Shape: <code>(samples,)</code> or <code>(samples, 2)</code></td></tr>
+<tr><td><code>start</code></td><td>int</td><td>Start sample index of the selected region</td></tr>
+<tr><td><code>end</code></td><td>int</td><td>End sample index of the selected region</td></tr>
+<tr><td><code>sr</code></td><td>int</td><td>Sample rate (default 44100)</td></tr>
+<tr><td><code>**kw</code></td><td>dict</td><td>Parameters from <code>get_params()</code></td></tr>
+</table>
+<div class="warn">
+<b>Important:</b> Always <code>audio_data.copy()</code> first! Never modify the original array. Only modify <code>result[start:end]</code>. Return the full array.
+</div>
+</div>
+
+<div class="section">
+<h2>Installing Your Effect</h2>
+<p>In Glitch Maker:</p>
+<ol style="margin-left: 20px;">
+<li>Click <b>Import</b> in the effects panel</li>
+<li>Choose <b>Import Effect Plugin (.py)</b></li>
+<li>Select your <code>.py</code> file and optionally the <code>_lang.json</code></li>
+<li>The effect appears immediately in the effects panel</li>
+</ol>
+</div>
+</div>
+
+<!-- ═══════════════════ FRANÇAIS ═══════════════════ -->
+
+<div class="fr">
+<h1>Comment creer un plugin d'effet personnalise</h1>
+<p>Ce guide vous montre comment creer un effet audio personnalise pour Glitch Maker. Chaque effet est un seul fichier <code>.py</code> avec un fichier de traduction <code>_lang.json</code> optionnel.</p>
+
+<div class="section">
+<h2>Structure du fichier</h2>
+<p>Votre fichier d'effet a besoin de 3 parties :</p>
+<table>
+<tr><th>Partie</th><th>Role</th><th>Obligatoire ?</th></tr>
+<tr><td><b>Metadonnees</b></td><td>ID de l'effet, icone, couleur, categorie</td><td>Oui</td></tr>
+<tr><td><b>Classe Dialog</b></td><td>Interface pour les controles de parametres (sliders, combos, etc.)</td><td>Oui</td></tr>
+<tr><td><b>Fonction process()</b></td><td>Le traitement audio reel (DSP)</td><td>Oui</td></tr>
+</table>
+<p>Optionnellement, un fichier <code>_lang.json</code> fournit le nom/description bilingue pour le catalogue.</p>
+</div>
+
+<div class="section">
+<h2>Exemple complet : Effet Tremolo</h2>
+<p>Voici un vrai effet de Glitch Maker — un tremolo qui module le volume a un rythme configurable.</p>
+
+<span class="filename">effect_tremolo.py</span>
+<pre><span class="comment"># ══════════════════════════════════════════════════
+# Metadonnees de l'effet
+# ══════════════════════════════════════════════════</span>
+EFFECT_ID      = <span class="string">"tremolo"</span>           <span class="comment"># ID unique (minuscules, pas d'espaces)</span>
+EFFECT_ICON    = <span class="string">"~"</span>                 <span class="comment"># Caractere pour l'icone</span>
+EFFECT_COLOR   = <span class="string">"#e07c24"</span>           <span class="comment"># Couleur hex du bouton</span>
+EFFECT_SECTION = <span class="string">"Modulation"</span>        <span class="comment"># Categorie: Basics, Pitch, Distortion,
+                                     #   Modulation, Space, Glitch, Custom</span>
+
+<span class="comment"># ══════════════════════════════════════════════════
+# Dialog (interface parametres)
+# ══════════════════════════════════════════════════</span>
+<span class="keyword">import</span> numpy <span class="keyword">as</span> np
+<span class="keyword">from</span> PyQt6.QtWidgets <span class="keyword">import</span> QLabel, QComboBox
+<span class="keyword">from</span> gui.effect_dialogs <span class="keyword">import</span> _Base, _slider_float
+
+<span class="keyword">class</span> <span class="cls">Dialog</span>(_Base):
+    <span class="keyword">def</span> <span class="func">__init__</span>(self, p=<span class="keyword">None</span>):
+        <span class="func">super</span>().__init__(<span class="string">"Tremolo"</span>, p)
+        <span class="comment"># _slider_float(layout, label, min, max, defaut, pas, decimales, suffixe, multiplicateur)</span>
+        self.rt = <span class="func">_slider_float</span>(self._lo, <span class="string">"Rate (Hz)"</span>, <span class="number">0.1</span>, <span class="number">30</span>, <span class="number">5</span>, <span class="number">0.5</span>, <span class="number">1</span>, <span class="string">" Hz"</span>, <span class="number">10</span>)
+        self.dp = <span class="func">_slider_float</span>(self._lo, <span class="string">"Depth"</span>, <span class="number">0</span>, <span class="number">1</span>, <span class="number">0.7</span>, <span class="number">0.1</span>, <span class="number">2</span>)
+        self._row(<span class="string">"Shape"</span>)
+        self.sh = QComboBox()
+        self.sh.addItems([<span class="string">"sine"</span>, <span class="string">"square"</span>, <span class="string">"triangle"</span>, <span class="string">"saw"</span>])
+        self._lo.addWidget(self.sh)
+        self._finish()     <span class="comment"># Toujours appeler _finish() a la fin !</span>
+
+    <span class="keyword">def</span> <span class="func">get_params</span>(self):
+        <span class="keyword">return</span> {<span class="string">"rate_hz"</span>: self.rt.value(), <span class="string">"depth"</span>: self.dp.value(), <span class="string">"shape"</span>: self.sh.currentText()}
+
+    <span class="keyword">def</span> <span class="func">set_params</span>(self, p):
+        self.rt.setValue(p.get(<span class="string">"rate_hz"</span>, <span class="number">5</span>))
+        self.dp.setValue(p.get(<span class="string">"depth"</span>, <span class="number">0.7</span>))
+        idx = self.sh.findText(p.get(<span class="string">"shape"</span>, <span class="string">"sine"</span>))
+        <span class="keyword">if</span> idx >= <span class="number">0</span>: self.sh.setCurrentIndex(idx)
+
+<span class="comment"># ══════════════════════════════════════════════════
+# DSP / Traitement
+# ══════════════════════════════════════════════════</span>
+
+<span class="keyword">def</span> <span class="func">process</span>(audio_data, start, end, sr=<span class="number">44100</span>, **kw):
+    <span class="comment">"""Fonction de traitement. DOIT retourner un array numpy de meme forme."""</span>
+    out = audio_data.copy()       <span class="comment"># Toujours copier !</span>
+    seg = out[start:end].astype(np.float64)
+    n = len(seg)
+
+    rate_hz = kw.get(<span class="string">"rate_hz"</span>, <span class="number">5.0</span>)   <span class="comment"># Lire les params depuis kw</span>
+    depth   = kw.get(<span class="string">"depth"</span>, <span class="number">0.7</span>)
+    shape   = kw.get(<span class="string">"shape"</span>, <span class="string">"sine"</span>)
+
+    t_arr = np.arange(n, dtype=np.float64) / sr
+    <span class="keyword">if</span> shape == <span class="string">"sine"</span>:
+        lfo = <span class="number">0.5</span> * (<span class="number">1.0</span> + np.sin(<span class="number">2.0</span> * np.pi * rate_hz * t_arr))
+    <span class="comment"># ... (autres formes d'onde)</span>
+
+    envelope = <span class="number">1.0</span> - depth * (<span class="number">1.0</span> - lfo)
+    <span class="keyword">if</span> seg.ndim == <span class="number">2</span>:
+        envelope = envelope.reshape(-<span class="number">1</span>, <span class="number">1</span>)
+    out[start:end] = (seg * envelope).astype(np.float32)
+    <span class="keyword">return</span> out</pre>
+
+<span class="filename">effect_tremolo_lang.json</span>
+<pre>{
+  <span class="string">"en"</span>: { <span class="string">"name"</span>: <span class="string">"Tremolo"</span>, <span class="string">"short"</span>: <span class="string">"Rhythmic volume wobble"</span>, <span class="string">"detail"</span>: <span class="string">"..."</span> },
+  <span class="string">"fr"</span>: { <span class="string">"name"</span>: <span class="string">"Tremolo"</span>, <span class="string">"short"</span>: <span class="string">"Oscillation rythmique du volume"</span>, <span class="string">"detail"</span>: <span class="string">"..."</span> }
+}</pre>
+</div>
+
+<div class="section">
+<h2>Reference des metadonnees</h2>
+<table>
+<tr><th>Variable</th><th>Type</th><th>Description</th></tr>
+<tr><td><code>EFFECT_ID</code></td><td>string</td><td>Identifiant unique, minuscules, sans espaces</td></tr>
+<tr><td><code>EFFECT_ICON</code></td><td>string</td><td>Caractere unique affiche dans le bouton</td></tr>
+<tr><td><code>EFFECT_COLOR</code></td><td>string</td><td>Couleur hex du bouton</td></tr>
+<tr><td><code>EFFECT_SECTION</code></td><td>string</td><td>Categorie : <code>Basics</code>, <code>Pitch</code>, <code>Distortion</code>, <code>Modulation</code>, <code>Space</code>, <code>Glitch</code>, ou <code>Custom</code></td></tr>
+</table>
+</div>
+
+<div class="section">
+<h2>Regles de la classe Dialog</h2>
+<ul style="margin-left: 20px;">
+<li>Doit s'appeler <code>Dialog</code> et heriter de <code>_Base</code></li>
+<li><code>__init__(self, p=None)</code> — appeler <code>super().__init__("Titre", p)</code> puis ajouter les widgets, puis <code>self._finish()</code></li>
+<li><code>get_params(self)</code> — retourner un dict des valeurs de parametres</li>
+<li><code>set_params(self, p)</code> — restaurer les parametres depuis un dict</li>
+</ul>
+</div>
+
+<div class="section">
+<h2>Regles de la fonction process()</h2>
+<div class="tip">
+<b>Signature :</b> <code>def process(audio_data, start, end, sr=44100, **kw)</code>
+</div>
+<table>
+<tr><th>Parametre</th><th>Type</th><th>Description</th></tr>
+<tr><td><code>audio_data</code></td><td>numpy array</td><td>Audio complet (1D mono ou 2D stereo)</td></tr>
+<tr><td><code>start</code></td><td>int</td><td>Index de debut de la region selectionnee</td></tr>
+<tr><td><code>end</code></td><td>int</td><td>Index de fin de la region selectionnee</td></tr>
+<tr><td><code>sr</code></td><td>int</td><td>Taux d'echantillonnage (defaut 44100)</td></tr>
+<tr><td><code>**kw</code></td><td>dict</td><td>Parametres de <code>get_params()</code></td></tr>
+</table>
+<div class="warn">
+<b>Important :</b> Toujours faire <code>audio_data.copy()</code> d'abord ! Ne jamais modifier l'array original. Modifier uniquement <code>result[start:end]</code>. Retourner l'array complet.
+</div>
+</div>
+
+<div class="section">
+<h2>Installer votre effet</h2>
+<ol style="margin-left: 20px;">
+<li>Cliquez sur <b>Import</b> dans le panneau d'effets</li>
+<li>Choisissez <b>Import Effect Plugin (.py)</b></li>
+<li>Selectionnez votre fichier <code>.py</code> et optionnellement le <code>_lang.json</code></li>
+<li>L'effet apparait immediatement dans le panneau d'effets</li>
+</ol>
+</div>
+</div>
+
+<footer>
+Glitch Maker — Mattéo Dauriac (Spiralyfox) —
+<a href="https://github.com/Spiralyfox/GlitchMaker">github.com/Spiralyfox/GlitchMaker</a>
+</footer>
+
+</div>
+
+<script>
+function setLang(lang) {
+    document.querySelectorAll('.en').forEach(e => e.style.display = lang === 'en' ? 'block' : 'none');
+    document.querySelectorAll('.fr').forEach(e => e.style.display = lang === 'fr' ? 'block' : 'none');
+    document.getElementById('btn-en').className = 'lang-btn ' + (lang === 'en' ? 'active' : 'inactive');
+    document.getElementById('btn-fr').className = 'lang-btn ' + (lang === 'fr' ? 'active' : 'inactive');
+}
+setLang('en');
+</script>
+</body>
+</html>

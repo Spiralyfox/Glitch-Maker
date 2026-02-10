@@ -40,7 +40,7 @@ th { background: #1a1a30; color: #a78bfa; }
 <!-- ═══════════════════════════════════ -->
 <h2>📂 Charger &amp; Sauvegarder l'audio</h2>
 
-<p><b>File &gt; Open</b> (ou glisser-déposer) — Chargez des fichiers MP3, WAV, FLAC, OGG, ou tout format supporté par FFmpeg. La waveform et la timeline se mettent à jour immédiatement.</p>
+<p><b>File &gt; Open</b> (ou glisser-déposer) — Chargez des fichiers MP3, WAV, FLAC, OGG, ou tout format supporté par FFmpeg. L'ouverture d'un fichier démarre un nouveau projet. Pour ajouter un audio supplémentaire, utilisez le bouton ＋ de la barre de transport.</p>
 
 <p><b>File &gt; Save / Save As</b> — Exportez l'audio traité. Choisissez WAV pour une qualité sans perte ou MP3/FLAC/OGG pour des formats compressés. Toute la chaîne d'effets est appliquée au fichier de sortie.</p>
 
@@ -60,6 +60,8 @@ th { background: #1a1a30; color: #a78bfa; }
 <p><b>Boucle automatique</b> — Quand il n'y a pas de sélection rouge et que la lecture atteint la fin du fichier, elle reboucle automatiquement au début au lieu de s'arrêter. S'il y a une sélection, la lecture boucle dans cette sélection.</p>
 
 <p><b>Curseur de volume</b> — Règle le volume de sortie de 0% à 100%. Le pourcentage est affiché à côté du curseur.</p>
+
+<p><b>Bouton ＋</b> — Ouvre un sélecteur de fichier pour ajouter un clip audio supplémentaire à la suite dans la timeline.</p>
 
 <p><b>Affichage du temps</b> — Montre la position actuelle / durée totale au format MM:SS.ms.</p>
 
@@ -86,6 +88,8 @@ th { background: #1a1a30; color: #a78bfa; }
 <p>La timeline se situe sous la waveform et affiche votre audio sous forme de blocs de clips colorés. Chaque fois que vous appliquez un effet à une sélection, un nouveau clip est créé montrant exactement quelle portion a été affectée.</p>
 
 <p><b>Cliquez sur la timeline</b> pour sauter à n'importe quelle position. Cliquez sur un clip pour le sélectionner (bordure surlignée).</p>
+
+<p><b>Supprimer un clip</b> — Clic droit → <b>Supprimer</b>, ou sélectionnez-le et appuyez sur <kbd>Suppr</kbd>. Les clips restants se repositionnent pour combler les vides. Impossible de supprimer le dernier clip.</p>
 
 <p><b>Zoom timeline</b> — Faites défiler la molette sur la timeline pour zoomer/dézoomer indépendamment de la waveform. Une barre de défilement horizontale apparaît sous la timeline quand on est zoomé.</p>
 
@@ -244,10 +248,20 @@ th { background: #1a1a30; color: #a78bfa; }
 
 <p><b>Presets</b> — Cliquez sur l'onglet "PR" dans le panneau d'effets pour passer en vue presets. Les presets sont des configurations sauvegardées de paramètres d'effets réapplicables instantanément.</p>
 
-<p>• <b>+ Preset</b> — Sauvegardez vos paramètres actuels comme nouveau preset.<br>
-• <b>Import</b> — Importez des presets depuis des fichiers.<br>
-• <b>Catalog</b> — Parcourez le catalogue de presets intégré.<br>
-• <b>⚙ Gérer</b> — Renommez, supprimez ou exportez vos presets.</p>
+<p>Le bas du panneau d'effets contient deux lignes de boutons :</p>
+
+<p><b>Ligne 1 :</b><br>
+• <b>Catalog</b> — Parcourez le catalogue intégré avec les descriptions de chaque effet.<br>
+• <b>Import</b> — Ouvre un menu de choix avec trois options : <b>Import Effect Plugin</b> (installer un effet personnalisé .py), <b>Import Preset</b> (charger un fichier .pspi), ou <b>Help</b> (documentation sur la création d'effets et presets, avec un bouton <b>Example Effect Code</b> qui ouvre une page HTML détaillée avec des exemples de code complets dans votre navigateur).<br>
+• <b>Export</b> — Ouvre un sélecteur affichant vos presets personnels. Choisissez-en un et exportez-le en fichier .pspi à partager.</p>
+
+<p><b>Ligne 2 :</b><br>
+• <b>New Preset</b> — Créez un nouveau preset : donnez-lui un nom, une description et des tags. Ajoutez des effets à la chaîne et cliquez sur <b>Settings</b> à côté de chaque effet pour configurer ses paramètres. Chaque effet ne peut apparaître qu'une seule fois dans la chaîne (les doublons sont empêchés). Un résumé des paramètres est affiché à côté de chaque nom d'effet. Avant de sauvegarder, vous pouvez tester le preset : chargez un fichier audio ou utilisez l'audio du projet actuel, puis cliquez sur <b>Play original</b> pour écouter le son brut, ou <b>Play with preset</b> pour écouter tous les effets appliqués. Les noms de presets doivent être uniques — vous ne pouvez pas créer deux presets avec le même nom.<br>
+• <b>Manage</b> — Ouvre une fenêtre à onglets avec deux sections : <b>My Presets</b> affiche vos presets personnels triés par tags alphabétiquement dans une arborescence — sélectionnez-en un et cliquez sur <b>Edit</b> pour rouvrir son dialogue de création complet (modifier nom, effets, tags, tester), ou <b>Delete</b> pour le supprimer. <b>Built-in</b> affiche les presets inclus (lecture seule). Utilisez <b>Manage tags</b> pour ajouter ou supprimer des tags globalement.</p>
+
+<p>Vous pouvez aussi importer/exporter des presets depuis le menu <b>File</b> (Export Presets / Import Presets).</p>
+
+<div class="tip">💡 Les fichiers de presets utilisent le format .pspi — un fichier JSON contenant des chaînes d'effets avec paramètres et tags. Partagez-les avec d'autres utilisateurs de Glitch Maker ! Cliquez sur Help dans le menu Import pour un guide complet, y compris un exemple de code annoté détaillé.</div>
 
 <!-- ═══════════════════════════════════ -->
 <h2>⚙️ Paramètres</h2>
@@ -280,7 +294,7 @@ th { background: #1a1a30; color: #a78bfa; }
 <!-- ═══════════════════════════════════ -->
 
 <p style="margin-top: 36px; color: #636e72; font-size: 12px; text-align: center;">
-Glitch Maker v6.2 — Mattéo Dauriac (Spiralyfox)<br>
+Glitch Maker v6.10 — Mattéo Dauriac (Spiralyfox)<br>
 <a href="https://github.com/Spiralyfox/GlitchMaker">github.com/Spiralyfox/GlitchMaker</a>
 </p>
 

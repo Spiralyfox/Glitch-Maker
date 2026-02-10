@@ -166,6 +166,11 @@ class AudioSettingsDialog(QDialog):
     def _refresh_devices(self):
         self._current_output = self.combo_out.currentData()
         self._current_input = self.combo_in.currentData()
+        try:
+            sd._terminate()
+            sd._initialize()
+        except Exception:
+            pass
         self._populate_devices()
 
     def _apply(self):

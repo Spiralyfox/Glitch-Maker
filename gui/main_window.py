@@ -22,7 +22,8 @@ from gui.transport_bar import TransportBar
 from gui.dialogs import RecordDialog, AboutDialog
 from gui.catalog_dialog import CatalogDialog
 from gui.settings_dialog import AudioSettingsDialog, LanguageSettingsDialog, ThemeSettingsDialog
-from gui.preset_dialog import PresetCreateDialog, PresetManageDialog, TagManageDialog
+from gui.preset_dialog import (PresetCreateDialog, PresetManageDialog,
+    TagManageDialog, ExportPresetDialog, ImportChooserDialog, HelpDialog)
 from gui.spectrum_widget import SpectrumWidget
 from gui.minimap_widget import MinimapWidget
 from gui.effect_history import EffectHistoryPanel
@@ -422,6 +423,7 @@ class MainWindow(QMainWindow):
         self.transport.pause_clicked.connect(self._pause)
         self.transport.stop_clicked.connect(self._stop)
         self.transport.volume_changed.connect(self.playback.set_volume)
+        self.transport.add_audio_clicked.connect(self._add_audio_to_timeline)
         self.waveform.position_clicked.connect(self._seek)
         self.waveform.selection_changed.connect(self._on_sel)
         self.waveform.drag_started.connect(self._on_drag_start)
@@ -431,6 +433,7 @@ class MainWindow(QMainWindow):
         self.effects_panel.effect_clicked.connect(self._on_effect)
         self.effects_panel.catalog_clicked.connect(self._catalog)
         self.effects_panel.import_clicked.connect(self._import_effect)
+        self.effects_panel.export_clicked.connect(self._export_presets)
         self.effects_panel.preset_clicked.connect(self._on_preset)
         self.effects_panel.preset_new_clicked.connect(self._new_preset)
         self.effects_panel.preset_manage_clicked.connect(self._manage_presets)
@@ -617,11 +620,25 @@ class MainWindow(QMainWindow):
     def _play(self):
         if self.audio_data is None: return
         try:
+            s, e = self._sel_range()
             if self.playback.is_paused:
-                self.playback.resume()
+                # Check if selection changed while paused
+                old_loop_s = self.playback.loop_start
+                old_loop_e = self.playback.loop_end
+                if s is not None and (s != old_loop_s or e != old_loop_e):
+                    # New/different selection → play in new zone
+                    self.playback.play_selection(s, e)
+                elif s is None and old_loop_s is not None:
+                    # Selection cleared → resume without loop
+                    self.playback.loop_start = None
+                    self.playback.loop_end = None
+                    self.playback.looping = False
+                    self.playback.resume()
+                else:
+                    # Same selection or no selection → just resume
+                    self.playback.resume()
                 self.transport.set_playing(True)
                 return
-            s, e = self._sel_range()
             if s is not None:
                 self.playback.play_selection(s, e)
             else:
@@ -875,34 +892,58 @@ class MainWindow(QMainWindow):
             st = ensure_stereo(data)
             name = os.path.splitext(os.path.basename(fp))[0]
 
-            if self.audio_data is None:
-                # First audio — set as base
-                self.audio_data, self.sample_rate = st, sr
-                self.current_filepath = fp
-                self.timeline.clear()
-                color = CLIP_COLORS[self._clip_color_idx % len(CLIP_COLORS)]
-                self._clip_color_idx += 1
-                self.timeline.add_clip(st, sr, name=name, position=0, color=color)
-                self._base_audio = st.copy()
-                self._effect_ops.clear()
-            else:
-                # Additional audio — different color
-                self._push_undo("Import")
-                color = CLIP_COLORS[self._clip_color_idx % len(CLIP_COLORS)]
-                self._clip_color_idx += 1
-                self.timeline.add_clip(st, sr, name=name, color=color)
-                self._rebuild_audio()
-                self._base_audio = self.audio_data.copy()
-                self._effect_ops.clear()
+            self.audio_data, self.sample_rate = st, sr
+            self.current_filepath = fp
+            self.timeline.clear()
+            self._clip_color_idx = 0
+            color = CLIP_COLORS[self._clip_color_idx % len(CLIP_COLORS)]
+            self._clip_color_idx += 1
+            self.timeline.add_clip(st, sr, name=name, position=0, color=color)
+            self._base_audio = st.copy()
+            self._effect_ops.clear()
 
             self._ops_undo.clear(); self._ops_redo.clear()
             self._update_undo_labels()
+            self.waveform.selection_start = None
+            self.waveform.selection_end = None
+            self.waveform._anchor = None
+            self.transport.set_selection_info("")
             self._refresh_all()
             self._sync_history_chain()
-            self._unsaved = True
+            self._unsaved = False
             self.setWindowTitle(f"{APP_NAME} — {os.path.basename(fp)}")
             self.statusBar().showMessage(t("status.loaded").format(f=os.path.basename(fp)))
         except Exception as e:
+            QMessageBox.critical(self, APP_NAME, str(e))
+
+    def _add_audio_to_timeline(self):
+        """Add an additional audio file as a new clip appended to the timeline."""
+        exts_list = " ".join(["*" + e for e in sorted(AUDIO_EXTENSIONS)])
+        fp, _ = QFileDialog.getOpenFileName(
+            self, "Add audio to timeline", "",
+            f"Audio ({exts_list});;All files (*)")
+        if not fp:
+            return
+        try:
+            data, sr = load_audio(fp)
+            st = ensure_stereo(data)
+            name = os.path.splitext(os.path.basename(fp))[0]
+            if self.audio_data is None:
+                self._load_audio(fp)
+                return
+            self._push_undo("Add clip")
+            color = CLIP_COLORS[self._clip_color_idx % len(CLIP_COLORS)]
+            self._clip_color_idx += 1
+            self.timeline.add_clip(st, sr, name=name, color=color)
+            self._rebuild_audio()
+            self._base_audio = self.audio_data.copy()
+            self._effect_ops.clear()
+            self._refresh_all()
+            self._sync_history_chain()
+            self._unsaved = True
+            self.statusBar().showMessage(f"Added: {os.path.basename(fp)}")
+        except Exception as e:
+            _log.error("Add audio error: %s", e, exc_info=True)
             QMessageBox.critical(self, APP_NAME, str(e))
 
     def _load_gspi(self, fp):
@@ -1291,34 +1332,39 @@ class MainWindow(QMainWindow):
             self._set_busy(False)
 
     def _new_preset(self):
-        d = PresetCreateDialog(self, self._plugins, get_language())
+        tags = self.preset_manager.get_all_tags()
+        d = PresetCreateDialog(tags, self, self.preset_manager)
         if d.exec() == d.DialogCode.Accepted:
-            data = d.get_preset_data()
+            data = d.result_preset
             if data:
-                self.preset_manager.add_preset(data)
-                self._refresh_presets()
+                self.preset_manager.add_preset(
+                    data["name"], data.get("description", ""),
+                    data.get("tags", []), data.get("effects", [])
+                )
+        # Always refresh (tags may have been modified even if dialog was cancelled)
+        self._refresh_presets()
 
     def _manage_presets(self):
-        d = PresetManageDialog(self, self.preset_manager)
+        d = PresetManageDialog(self.preset_manager, self)
         d.exec()
         self._refresh_presets()
 
     def _export_presets(self):
-        fp, _ = QFileDialog.getSaveFileName(self, "Export Presets", "presets.json", "JSON (*.json)")
-        if fp:
-            try:
-                self.preset_manager.export_to_file(fp)
-                self.statusBar().showMessage(f"Presets exported to {os.path.basename(fp)}")
-            except Exception as e:
-                QMessageBox.critical(self, APP_NAME, str(e))
+        d = ExportPresetDialog(self.preset_manager, self)
+        d.exec()
+        if d.exported:
+            self.statusBar().showMessage("Preset exported")
 
     def _import_presets(self):
-        fp, _ = QFileDialog.getOpenFileName(self, "Import Presets", "", "JSON (*.json)")
+        fp, _ = QFileDialog.getOpenFileName(self, "Import Presets", "", "Presets (*.pspi);;JSON (*.json)")
         if fp:
             try:
-                n = self.preset_manager.import_from_file(fp)
+                n, skipped = self.preset_manager.import_presets(fp)
                 self._refresh_presets()
-                self.statusBar().showMessage(f"Imported {n} presets")
+                msg = f"Imported {n} presets"
+                if skipped:
+                    msg += f" ({len(skipped)} skipped: already exist)"
+                self.statusBar().showMessage(msg)
             except Exception as e:
                 QMessageBox.critical(self, APP_NAME, str(e))
 
@@ -1449,16 +1495,16 @@ class MainWindow(QMainWindow):
         try:
             clip = self._find_clip(cid)
             if clip is None: return
-            # Prevent deletion if it's the last clip
             if len(self.timeline.clips) <= 1:
                 QMessageBox.information(self, APP_NAME, t("timeline.last_clip"))
                 return
             self._push_undo("Delete clip")
-            self.timeline.clips.remove(clip)
+            self.timeline.remove_clip(clip)
             self._rebuild_audio()
             self._base_audio = self.audio_data.copy() if self.audio_data is not None else None
             self._effect_ops.clear()
             self._sync_history_chain()
+            self._refresh_all()
             self._unsaved = True
         except Exception as e:
             _log.error("Delete clip error: %s", e, exc_info=True)
@@ -1752,13 +1798,22 @@ class MainWindow(QMainWindow):
                 QMessageBox.information(self, APP_NAME, t("settings.restart"))
 
     def _import_effect(self):
-        from gui.import_plugin_dialog import ImportPluginDialog
-        d = ImportPluginDialog(self)
-        if d.exec() == d.DialogCode.Accepted:
-            self._plugins = load_plugins(force_reload=True)
-            self._build_menus()
-            self.effects_panel.reload_plugins()
-            self.statusBar().showMessage("Plugin imported ✓")
+        """Import chooser: Effect plugin, Preset, or Help."""
+        d = ImportChooserDialog(self)
+        if d.exec() != d.DialogCode.Accepted or not d.choice:
+            return
+        if d.choice == ImportChooserDialog.CHOICE_EFFECT:
+            from gui.import_plugin_dialog import ImportPluginDialog
+            dlg = ImportPluginDialog(self)
+            if dlg.exec() == dlg.DialogCode.Accepted:
+                self._plugins = load_plugins(force_reload=True)
+                self._build_menus()
+                self.effects_panel.reload_plugins()
+                self.statusBar().showMessage("Plugin imported")
+        elif d.choice == ImportChooserDialog.CHOICE_PRESET:
+            self._import_presets()
+        elif d.choice == ImportChooserDialog.CHOICE_HELP:
+            HelpDialog(self).exec()
 
     # ══════ Misc ══════
 
@@ -1806,8 +1861,7 @@ class MainWindow(QMainWindow):
             QMessageBox.information(self, APP_NAME, "Manual not found")
 
     def _catalog(self):
-        d = CatalogDialog(self, self._plugins, get_language())
-        d.effect_selected.connect(self._on_effect)
+        d = CatalogDialog(self)
         d.exec()
 
     # ══════ Drag & Drop ══════

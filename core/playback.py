@@ -153,6 +153,7 @@ class PlaybackEngine:
     def stop(self):
         """Arrete la lecture et revient au debut."""
         self.is_playing = False; self.is_paused = False; self.position = 0
+        self.loop_start = None; self.loop_end = None; self.looping = False
 
     def seek(self, pos):
         """Deplace la tete de lecture a la position donnee (en samples)."""

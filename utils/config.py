@@ -1,8 +1,8 @@
 """Configuration & constants for Glitch Maker."""
-import os, json
+import os, sys, json, shutil
 
 APP_NAME = "Glitch Maker"
-APP_VERSION = "6.2"
+APP_VERSION = "6.10"
 WINDOW_MIN_WIDTH = 1050
 WINDOW_MIN_HEIGHT = 650
 RECORDING_SAMPLE_RATE = 44100
@@ -88,7 +88,63 @@ def get_colors() -> dict:
     """Return the current color palette dict."""
     return COLORS
 
-_SETTINGS_PATH = os.path.join(os.path.expanduser("~"), ".glitchmaker_settings.json")
+# ═══════════════════════════════════════════════════
+#  Portable data directory — next to exe / main.py
+# ═══════════════════════════════════════════════════
+
+def _get_app_root() -> str:
+    """Return the directory containing the exe (frozen) or main.py (dev)."""
+    if getattr(sys, 'frozen', False):
+        return os.path.dirname(sys.executable)
+    return os.path.dirname(os.path.abspath(os.path.join(__file__, "..")))
+
+
+def get_data_dir() -> str:
+    """Return the portable data directory (created if needed).
+    All user data lives in <app_root>/data/."""
+    d = os.path.join(_get_app_root(), "data")
+    os.makedirs(d, exist_ok=True)
+    return d
+
+
+def _migrate_old_data():
+    """One-time migration: move old ~/.glitchmaker* files to data/ folder."""
+    home = os.path.expanduser("~")
+    data = get_data_dir()
+    marker = os.path.join(data, ".migrated")
+    if os.path.exists(marker):
+        return
+    migrations = [
+        (os.path.join(home, ".glitchmaker_settings.json"), os.path.join(data, "settings.json")),
+        (os.path.join(home, ".glitchmaker_presets.json"),  os.path.join(data, "presets.json")),
+        (os.path.join(home, ".glitchmaker_tags.json"),     os.path.join(data, "tags.json")),
+        (os.path.join(home, ".glitchmaker_deleted_tags.json"), os.path.join(data, "deleted_tags.json")),
+    ]
+    for old, new in migrations:
+        if os.path.isfile(old) and not os.path.isfile(new):
+            try:
+                shutil.copy2(old, new)
+            except Exception:
+                pass
+    # Migrate ffmpeg dir
+    old_ffmpeg = os.path.join(home, ".glitchmaker", "ffmpeg")
+    new_ffmpeg = os.path.join(data, "ffmpeg")
+    if os.path.isdir(old_ffmpeg) and not os.path.isdir(new_ffmpeg):
+        try:
+            shutil.copytree(old_ffmpeg, new_ffmpeg)
+        except Exception:
+            pass
+    try:
+        with open(marker, "w") as f:
+            f.write("migrated")
+    except Exception:
+        pass
+
+
+# Run migration on import
+_migrate_old_data()
+
+_SETTINGS_PATH = os.path.join(get_data_dir(), "settings.json")
 
 def load_settings() -> dict:
     """Charge les settings depuis settings.json."""

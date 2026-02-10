@@ -2,6 +2,7 @@
 from utils.logger import get_logger
 _log = get_logger("presets")
 import json, os, sys
+from utils.config import get_data_dir
 
 if getattr(sys, 'frozen', False):
     _BASE_DIR = sys._MEIPASS
@@ -10,9 +11,9 @@ else:
     _BASE_DIR = os.path.dirname(_THIS_DIR)
 
 _BUILTIN_PATH = os.path.join(_BASE_DIR, "assets", "presets.json")
-_USER_PATH = os.path.join(os.path.expanduser("~"), ".glitchmaker_presets.json")
-_USER_TAGS_PATH = os.path.join(os.path.expanduser("~"), ".glitchmaker_tags.json")
-_DELETED_TAGS_PATH = os.path.join(os.path.expanduser("~"), ".glitchmaker_deleted_tags.json")
+_USER_PATH = os.path.join(get_data_dir(), "presets.json")
+_USER_TAGS_PATH = os.path.join(get_data_dir(), "tags.json")
+_DELETED_TAGS_PATH = os.path.join(get_data_dir(), "deleted_tags.json")
 
 
 class PresetManager:

@@ -40,7 +40,7 @@ th { background: #1a1a30; color: #a78bfa; }
 <!-- ═══════════════════════════════════ -->
 <h2>📂 Loading &amp; Saving Audio</h2>
 
-<p><b>File &gt; Open</b> (or drag &amp; drop) — Load MP3, WAV, FLAC, OGG, or any format supported by FFmpeg. The waveform and timeline update immediately.</p>
+<p><b>File &gt; Open</b> (or drag &amp; drop) — Load MP3, WAV, FLAC, OGG, or any format supported by FFmpeg. Opening a file starts a fresh project. To add extra audio, use the ＋ button in the transport bar.</p>
 
 <p><b>File &gt; Save / Save As</b> — Export the processed audio. Choose WAV for lossless quality or MP3/FLAC/OGG for compressed formats. The entire effect chain is baked into the output.</p>
 
@@ -60,6 +60,8 @@ th { background: #1a1a30; color: #a78bfa; }
 <p><b>Automatic looping</b> — When there is no red selection and playback reaches the end of the file, it loops back to the beginning automatically instead of stopping. If a selection exists, playback loops within that selection.</p>
 
 <p><b>Volume slider</b> — Adjusts output volume from 0% to 100%. The percentage is displayed next to the slider.</p>
+
+<p><b>＋ Add button</b> — Opens a file dialog to add an extra audio clip appended to the timeline.</p>
 
 <p><b>Time display</b> — Shows current position / total duration in MM:SS.ms format.</p>
 
@@ -86,6 +88,8 @@ th { background: #1a1a30; color: #a78bfa; }
 <p>The timeline sits below the waveform and displays your audio as colored clip blocks. Each time you apply an effect to a selection, a new clip is created showing exactly which portion was affected.</p>
 
 <p><b>Click on the timeline</b> to jump to any position. Click on a clip to select it (highlighted border).</p>
+
+<p><b>Delete a clip</b> — Right-click a clip → <b>Delete</b>, or select it and press <kbd>Delete</kbd>. Remaining clips reposition to close gaps. You cannot delete the last clip.</p>
 
 <p><b>Timeline zoom</b> — Scroll the mouse wheel over the timeline to zoom in/out independently from the waveform. A horizontal scrollbar appears below the timeline when zoomed in.</p>
 
@@ -244,10 +248,20 @@ th { background: #1a1a30; color: #a78bfa; }
 
 <p><b>Presets</b> — Click the "PR" tab in the effects panel to switch to preset view. Presets are saved configurations of effect parameters that you can re-apply instantly.</p>
 
-<p>• <b>+ Preset</b> — Save your current effect parameters as a new preset.<br>
-• <b>Import</b> — Import presets from files.<br>
-• <b>Catalog</b> — Browse the built-in preset catalog.<br>
-• <b>⚙ Manage</b> — Rename, delete, or export your presets.</p>
+<p>The bottom of the effects panel has two rows of buttons:</p>
+
+<p><b>Row 1:</b><br>
+• <b>Catalog</b> — Browse the built-in effect catalog with descriptions of every effect.<br>
+• <b>Import</b> — Opens a chooser dialog with three options: <b>Import Effect Plugin</b> (install a custom .py effect), <b>Import Preset</b> (load a .pspi preset file), or <b>Help</b> (documentation on how to create effects and presets, with an <b>Example Effect Code</b> button that opens a detailed HTML page with full code examples in your browser).<br>
+• <b>Export</b> — Opens a selector showing your user-created presets. Choose one and export it as a .pspi file you can share.</p>
+
+<p><b>Row 2:</b><br>
+• <b>New Preset</b> — Create a new preset: give it a name, description, and tags. Add effects to the chain and click the <b>Settings</b> button next to each effect to configure its parameters. Each effect can only appear once in the chain (duplicates are prevented). A parameter summary is shown next to each effect name. Before saving, you can test the preset: load an audio file or use the current project audio, then click <b>Play original</b> to hear the unprocessed sound, or <b>Play with preset</b> to hear all effects applied. Preset names must be unique — you cannot create two presets with the same name.<br>
+• <b>Manage</b> — Opens a tabbed window with two sections: <b>My Presets</b> shows your user-created presets sorted by tags alphabetically in a tree view — select one and click <b>Edit</b> to reopen its full creation dialog (modify name, effects, tags, test it), or <b>Delete</b> to remove it. <b>Built-in</b> shows the included presets (read-only). Use <b>Manage tags</b> to add or remove tags globally.</p>
+
+<p>You can also import/export presets from the <b>File</b> menu (Export Presets / Import Presets).</p>
+
+<div class="tip">💡 Preset files use the .pspi format — a JSON file containing effect chains with parameters and tags. Share them with other Glitch Maker users! Click Help in the Import dialog for a full guide on creating custom effects and presets, including a detailed annotated code example.</div>
 
 <!-- ═══════════════════════════════════ -->
 <h2>⚙️ Settings</h2>
@@ -280,7 +294,7 @@ th { background: #1a1a30; color: #a78bfa; }
 <!-- ═══════════════════════════════════ -->
 
 <p style="margin-top: 36px; color: #636e72; font-size: 12px; text-align: center;">
-Glitch Maker v6.2 — Mattéo Dauriac (Spiralyfox)<br>
+Glitch Maker v6.10 — Mattéo Dauriac (Spiralyfox)<br>
 <a href="https://github.com/Spiralyfox/GlitchMaker">github.com/Spiralyfox/GlitchMaker</a>
 </p>
 

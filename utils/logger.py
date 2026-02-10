@@ -18,12 +18,13 @@ LOG_DATE = "%H:%M:%S"
 
 
 def _get_log_dir():
-    """Return the logs directory next to the executable or script."""
+    """Return the logs directory inside the portable data folder."""
     if getattr(sys, 'frozen', False):
         base = os.path.dirname(sys.executable)
     else:
         base = os.path.dirname(os.path.abspath(os.path.join(__file__, "..")))
-    return os.path.join(base, "logs")
+    d = os.path.join(base, "data", "logs")
+    return d
 
 
 _LOG_DIR = _get_log_dir()

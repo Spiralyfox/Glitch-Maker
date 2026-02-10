@@ -63,6 +63,23 @@ class Timeline:
         """Supprime tous les clips de la timeline."""
         self.clips.clear()
 
+    def remove_clip(self, clip_or_idx):
+        """Remove a clip then close gaps."""
+        if isinstance(clip_or_idx, int):
+            if 0 <= clip_or_idx < len(self.clips):
+                self.clips.pop(clip_or_idx)
+        elif clip_or_idx in self.clips:
+            self.clips.remove(clip_or_idx)
+        self.reposition_clips()
+
+    def reposition_clips(self):
+        """Place clips end-to-end in current order, closing all gaps."""
+        self.clips.sort(key=lambda c: c.position)
+        pos = 0
+        for c in self.clips:
+            c.position = pos
+            pos += c.duration_samples
+
     def add_clip(self, audio_data: np.ndarray, sr: int,
                  name: str = "Clip", position: int | None = None,
                  color: str = "", copy: bool = True):

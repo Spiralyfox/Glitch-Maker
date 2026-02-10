@@ -276,6 +276,7 @@ class EffectsPanel(QWidget):
     preset_new_clicked = pyqtSignal()
     preset_manage_clicked = pyqtSignal()
     import_clicked = pyqtSignal()
+    export_clicked = pyqtSignal()
     quick_apply = pyqtSignal(str)         # step 38: right-click quick apply
 
     def __init__(self, parent=None):
@@ -363,28 +364,38 @@ class EffectsPanel(QWidget):
         )
         lo.addWidget(self._scroll)
 
-        # Footer
+        # Footer — two rows of text buttons (no emojis)
         foot = QWidget()
-        foot.setFixedHeight(32)
+        foot.setFixedHeight(56)
         foot.setStyleSheet(
             f"background: {COLORS['bg_medium']}; "
             f"border-top: 1px solid {COLORS['border']};"
         )
-        fl = QHBoxLayout(foot)
-        fl.setContentsMargins(4, 0, 4, 0)
-        fl.setSpacing(2)
-        self._btn_catalog = self._sbtn("\U0001f4d6 Catalog")
+        foot_lo = QVBoxLayout(foot)
+        foot_lo.setContentsMargins(4, 3, 4, 3)
+        foot_lo.setSpacing(2)
+
+        row1 = QHBoxLayout(); row1.setSpacing(2)
+        self._btn_catalog = self._sbtn("Catalog")
         self._btn_catalog.clicked.connect(self.catalog_clicked.emit)
-        self._btn_import = self._sbtn("⬇ Import")
+        self._btn_import = self._sbtn("Import")
         self._btn_import.clicked.connect(self.import_clicked.emit)
-        self._btn_new = self._sbtn("\uff0b Preset")
+        self._btn_export = self._sbtn("Export")
+        self._btn_export.clicked.connect(self.export_clicked.emit)
+        row1.addWidget(self._btn_catalog)
+        row1.addWidget(self._btn_import)
+        row1.addWidget(self._btn_export)
+        foot_lo.addLayout(row1)
+
+        row2 = QHBoxLayout(); row2.setSpacing(2)
+        self._btn_new = self._sbtn("New Preset")
         self._btn_new.clicked.connect(self.preset_new_clicked.emit)
-        self._btn_manage = self._sbtn("\u2699")
+        self._btn_manage = self._sbtn("Manage")
         self._btn_manage.clicked.connect(self.preset_manage_clicked.emit)
-        fl.addWidget(self._btn_catalog)
-        fl.addWidget(self._btn_import)
-        fl.addWidget(self._btn_new)
-        fl.addWidget(self._btn_manage)
+        row2.addWidget(self._btn_new)
+        row2.addWidget(self._btn_manage)
+        foot_lo.addLayout(row2)
+
         lo.addWidget(foot)
 
         self.reload_plugins()

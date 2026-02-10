@@ -55,7 +55,7 @@ class ImportPluginDialog(QDialog):
         lo.setSpacing(10)
         lo.setContentsMargins(20, 16, 20, 16)
 
-        title = QLabel("🧩 Effect Plugins")
+        title = QLabel("Effect Plugins")
         title.setFont(QFont("Segoe UI", 14, QFont.Weight.Bold))
         title.setStyleSheet(f"color: {COLORS['accent']};")
         lo.addWidget(title)
@@ -79,7 +79,7 @@ class ImportPluginDialog(QDialog):
         py_row = QHBoxLayout()
         self._py_label = QLabel("No .py file selected")
         self._py_label.setStyleSheet(f"color: {COLORS['text_dim']}; font-size: 10px;")
-        py_btn = _btn("📄 Select .py", COLORS['button_bg'])
+        py_btn = _btn("Select .py", COLORS['button_bg'])
         py_btn.clicked.connect(self._pick_py)
         py_row.addWidget(self._py_label, stretch=1)
         py_row.addWidget(py_btn)
@@ -88,13 +88,13 @@ class ImportPluginDialog(QDialog):
         json_row = QHBoxLayout()
         self._json_label = QLabel("No .json file (optional)")
         self._json_label.setStyleSheet(f"color: {COLORS['text_dim']}; font-size: 10px;")
-        json_btn = _btn("🌐 Select .json", COLORS['button_bg'])
+        json_btn = _btn("Select .json", COLORS['button_bg'])
         json_btn.clicked.connect(self._pick_json)
         json_row.addWidget(self._json_label, stretch=1)
         json_row.addWidget(json_btn)
         ilo.addLayout(json_row)
 
-        install_btn = _btn("⬇ Install Effect")
+        install_btn = _btn("Install Effect")
         install_btn.clicked.connect(self._install)
         ilo.addWidget(install_btn)
 
@@ -110,7 +110,7 @@ class ImportPluginDialog(QDialog):
         inst_lo.addWidget(self._list)
 
         rm_row = QHBoxLayout()
-        rm_btn = _btn("🗑 Remove Selected", "#9b2226")
+        rm_btn = _btn("Remove Selected", "#9b2226")
         rm_btn.clicked.connect(self._remove)
         rm_row.addStretch()
         rm_row.addWidget(rm_btn)
@@ -166,7 +166,7 @@ class ImportPluginDialog(QDialog):
             self._changed = True
             QMessageBox.information(
                 self, "Import",
-                f"✅ Effect \"{entry['name']}\" installed!\n"
+                f"Effect \"{entry['name']}\" installed!\n"
                 f"It will appear in the '{entry['section']}' section."
             )
             self._py_path = None
