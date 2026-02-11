@@ -13,7 +13,7 @@ def save_project(filepath, timeline, sr, source_path="",
                  undo_stack=None, redo_stack=None):
     with zipfile.ZipFile(filepath, 'w', zipfile.ZIP_DEFLATED) as zf:
         meta = {
-            "version": "7.1.BETA",
+            "version": "7.0",
             "sample_rate": sr,
             "source_path": source_path,
             "clips": [],

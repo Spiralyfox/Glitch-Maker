@@ -1,6 +1,6 @@
 """History panel — Right sidebar.
-Displays all actions (effects, cuts, fades, recordings, clip adds, etc.)
-with toggle, edit and individual delete. All action types are treated equally:
+Displays all actions (effects, cuts, fades, recordings, clip adds, automations, etc.)
+with toggle and individual delete. All action types are treated equally:
 every op can be toggled on/off or deleted independently.
 """
 from PyQt6.QtWidgets import (
@@ -15,6 +15,7 @@ from utils.translator import t
 # ── Action type metadata: icon, default color ──
 _ACTION_META = {
     "effect":       ("🎛", "#6c5ce7"),
+    "automation":   ("📈", "#7c3aed"),
     "cut_silence":  ("✂", "#e17055"),
     "cut_splice":   ("✂", "#e17055"),
     "fade_in":      ("🔊", "#00b894"),
@@ -208,9 +209,10 @@ class EffectHistoryPanel(QWidget):
             icon = _get_action_icon(op)
             color = _get_action_color(op)
             scope = _get_scope_label(op)
-            # Effects (not structural) are editable
+            # Effects (not structural, not automation) are editable
             action_type = op.get("type", "effect")
             editable = (action_type not in _STRUCTURAL_TYPES
+                        and action_type != "automation"
                         and op.get("effect_id") is not None)
 
             item = _HistItem(

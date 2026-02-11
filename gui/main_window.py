@@ -24,7 +24,7 @@ from gui.spectrum_widget import SpectrumWidget
 from gui.minimap_widget import MinimapWidget
 from gui.effect_history import EffectHistoryPanel
 from gui.progress_overlay import ProgressOverlay
-
+from gui.automation_window import AutomationWindow
 
 from core.audio_engine import (
     load_audio, export_audio, ensure_stereo, get_duration, format_time,
@@ -441,6 +441,10 @@ class MainWindow(QMainWindow):
         self.progress_overlay = ProgressOverlay(center)
         self.progress_overlay.setVisible(False)
 
+        # Automation window (floating, hidden by default)
+        self._auto_win = AutomationWindow(self._plugins, parent=self)
+        self._auto_win.hide()
+
     def _make_toolbar_btn(self, text):
         b = QPushButton(text); b.setFixedHeight(26)
         b.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -481,6 +485,7 @@ class MainWindow(QMainWindow):
         panels = [
             ("spectrum",        t("view.spectrum"),      False),
             ("effect_history",  t("view.history"),       True),
+            ("automation",      "Automations",           False),
         ]
         for key, label, default_on in panels:
             act = QAction(label, self)
@@ -581,6 +586,18 @@ class MainWindow(QMainWindow):
         self.effect_history.op_deleted.connect(self._delete_op)
         self.effect_history.op_toggled.connect(self._toggle_op)
         self.effect_history.op_edit_clicked.connect(self._edit_effect_op)
+
+        # Automation window signals
+        self._auto_win.automation_added.connect(self._add_automation)
+        self._auto_win.automation_edited.connect(self._edit_automation)
+        self._auto_win.automation_deleted.connect(self._delete_op)
+        self._auto_win.automation_toggled.connect(self._toggle_op)
+        self._auto_win.preview_requested.connect(self._preview_automation)
+        self._auto_win.preview_base_requested.connect(self._preview_base_region)
+        self._auto_win.stop_requested.connect(self._stop)
+        self._auto_win.window_closed.connect(self._on_auto_win_closed)
+        self._auto_win.set_playback_engine(self.playback)
+        self.transport.automations_clicked.connect(self._toggle_auto_window)
 
     def _update_undo_labels(self):
         has_u = bool(self._ops_undo)
@@ -1291,6 +1308,11 @@ class MainWindow(QMainWindow):
         """Apply a single op on current audio_data (fast, for new ops)."""
         if not op.get("enabled", True) or self.audio_data is None:
             return
+        if op.get("type") == "automation":
+            self._render_auto_op(op)
+            self._update_clips_from_audio()
+            self._refresh_all()
+            return
         plugin = self._find_plugin(op["effect_id"])
         if not plugin: return
         s = op.get("start", 0)
@@ -1371,6 +1393,13 @@ class MainWindow(QMainWindow):
                             self._offset_tracker.register_remove(init_s, init_e)
                 continue
 
+            # ── Automation ops ──
+            if op_type == "automation":
+                self._render_auto_op_tracked(op)
+                # Sync modified audio back to clips so next structural op sees changes
+                self._update_clips_from_audio()
+                continue
+
             # ── Effect ops ──
             plugin = self._find_plugin(op.get("effect_id"))
             if not plugin:
@@ -1414,9 +1443,73 @@ class MainWindow(QMainWindow):
         self._update_clips_from_audio()
         self._refresh_all()
 
+    def _render_auto_op(self, op):
+        """Render a single automation op on self.audio_data (multi-param)."""
+        from core.automation import apply_automation_multi
+        plugin = self._find_plugin(op.get("effect_id"))
+        if not plugin:
+            return
+        n = len(self.audio_data)
+        s = op.get("start") or 0
+        e = op.get("end") or n
+        s = max(0, min(int(s), n))
+        e = max(s, min(int(e), n))
+        if e - s < 1:
+            return
+        auto_params = op.get("auto_params", [])
+        # Legacy single-param fallback
+        if not auto_params and op.get("auto_param"):
+            auto_params = [{"key": op["auto_param"], "mode": "automated",
+                            "default_val": op.get("auto_default", 0),
+                            "target_val": op.get("auto_target", 1),
+                            "curve_points": op.get("curve_points", [(0, 0), (1, 1)])}]
+        if not auto_params:
+            return
+        try:
+            self.audio_data = apply_automation_multi(
+                self.audio_data, s, e,
+                plugin.process_fn, auto_params, self.sample_rate)
+        except Exception as ex:
+            _log.warning("Automation render %s failed: %s", op.get("name"), ex)
+
+    def _render_auto_op_tracked(self, op):
+        """Like _render_auto_op but uses init-space coordinates via _offset_tracker (v7)."""
+        from core.automation import apply_automation_multi
+        plugin = self._find_plugin(op.get("effect_id"))
+        if not plugin:
+            return
+        n = len(self.audio_data)
+        # Use initial-space coordinates if available (v7)
+        init_s = op.get("init_start")
+        init_e = op.get("init_end")
+        if init_s is not None and init_e is not None:
+            s, e = self._offset_tracker.initial_range_to_current(init_s, init_e)
+        else:
+            # Backward compat: use stored current-space positions
+            s = op.get("start") or 0
+            e = op.get("end") or n
+        s = max(0, min(int(s), n))
+        e = max(s, min(int(e), n))
+        if e - s < 1:
+            return
+        auto_params = op.get("auto_params", [])
+        if not auto_params and op.get("auto_param"):
+            auto_params = [{"key": op["auto_param"], "mode": "automated",
+                            "default_val": op.get("auto_default", 0),
+                            "target_val": op.get("auto_target", 1),
+                            "curve_points": op.get("curve_points", [(0, 0), (1, 1)])}]
+        if not auto_params:
+            return
+        try:
+            self.audio_data = apply_automation_multi(
+                self.audio_data, s, e,
+                plugin.process_fn, auto_params, self.sample_rate)
+        except Exception as ex:
+            _log.warning("Automation render %s failed: %s", op.get("name"), ex)
+
     def _delete_op(self, uid):
         """Delete any op by uid and re-render from initial state.
-        All op types (structural and effect) are treated equally."""
+        All op types (structural, effect, automation) are treated equally."""
         idx = next((i for i, o in enumerate(self._effect_ops) if o.get("uid") == uid), None)
         if idx is None:
             return
@@ -1454,8 +1547,8 @@ class MainWindow(QMainWindow):
         op = next((o for o in self._effect_ops if o.get("uid") == uid), None)
         if op is None:
             return
-        # Only allow editing non-structural ops
-        if op.get("type", "effect") in self._STRUCTURAL_TYPES:
+        # Only allow editing non-structural, non-automation ops
+        if op.get("type", "effect") in self._STRUCTURAL_TYPES or op.get("type") == "automation":
             return
         plugin = self._find_plugin(op.get("effect_id"))
         if not plugin:
@@ -1539,8 +1632,21 @@ class MainWindow(QMainWindow):
         self._unsaved = True
 
     def _sync_history_chain(self):
-        """Sync history panel with current ops."""
+        """Sync history panel and automation window with current ops."""
         self.effect_history.set_ops(self._effect_ops)
+        if self._auto_win.isVisible():
+            self._auto_win.set_automations(self._effect_ops)
+            audio = self.audio_data if self.audio_data is not None else self._base_audio
+            if audio is not None:
+                self._auto_win.set_audio(audio, self.sample_rate)
+
+    def _sync_auto_audio(self):
+        """Push current rendered audio to the automation window.
+        Uses the fully-rendered audio_data so the preview reflects prior effects."""
+        audio = self.audio_data if self.audio_data is not None else self._base_audio
+        if audio is not None:
+            self._auto_win.set_audio(audio, self.sample_rate)
+            self._auto_win.set_automations(self._effect_ops)
 
     # ── Structural ops helpers ──
 
@@ -1928,6 +2034,79 @@ class MainWindow(QMainWindow):
         self._base_audio = self.audio_data.copy() if self.audio_data is not None else None
         return True
 
+    def _add_automation(self, op):
+        """Add a new automation as an effect op."""
+        import uuid as _uuid
+        op["uid"] = str(_uuid.uuid4())[:8]
+        op["enabled"] = True
+        op["is_global"] = False
+        op["color"] = "#7c3aed"
+        op["timestamp"] = datetime.now().strftime("%d/%m %H:%M:%S")
+        op["params"] = {}
+        # Convert to initial-space (v7)
+        s, e = op.get("start"), op.get("end")
+        if s is not None and e is not None:
+            self._offset_tracker.build_from_ops(self._effect_ops)
+            op["init_start"], op["init_end"] = self._offset_tracker.current_range_to_initial(s, e)
+        self._add_op(op)
+
+    def _edit_automation(self, op):
+        """Edit an existing automation op (multi-param)."""
+        uid = op.get("uid")
+        existing = next((o for o in self._effect_ops if o.get("uid") == uid), None)
+        if existing is None:
+            return
+        self._push_undo(f"Edit: {op.get('name', 'Automation')}")
+        for k in ("name", "effect_id", "auto_params", "start", "end"):
+            if k in op:
+                existing[k] = op[k]
+        # Recompute initial-space coordinates if range changed (v7)
+        s, e = existing.get("start"), existing.get("end")
+        if s is not None and e is not None:
+            self._offset_tracker.build_from_ops(self._effect_ops)
+            existing["init_start"], existing["init_end"] = self._offset_tracker.current_range_to_initial(s, e)
+        self._render_from_ops()
+        self._sync_history_chain()
+        self._unsaved = True
+
+    def _preview_automation(self, config, start, end):
+        """Preview a multi-param automation on the current audio (with all prior effects)."""
+        if self.audio_data is None:
+            return
+        from core.automation import apply_automation_multi
+        plugin = self._find_plugin(config.get("effect_id"))
+        if not plugin:
+            return
+        auto_params = config.get("auto_params", [])
+        if not auto_params:
+            return
+        try:
+            preview = self.audio_data.copy()
+            s = max(0, min(start, len(preview)))
+            e = max(s, min(end, len(preview)))
+            if e - s > 0:
+                preview = apply_automation_multi(
+                    preview, s, e,
+                    plugin.process_fn, auto_params, self.sample_rate)
+            self.playback.load(preview, self.sample_rate)
+            self.playback.play_selection(s, e)
+        except Exception as ex:
+            _log.error("Automation preview error: %s", ex, exc_info=True)
+
+    def _preview_base_region(self, start, end):
+        """Play the current audio in a given region (no additional automation)."""
+        audio = self.audio_data if self.audio_data is not None else self._base_audio
+        if audio is None:
+            return
+        try:
+            s = max(0, min(start, len(audio)))
+            e = max(s, min(end, len(audio)))
+            if e - s > 0:
+                self.playback.load(audio, self.sample_rate)
+                self.playback.play_selection(s, e)
+        except Exception as ex:
+            _log.error("Base preview error: %s", ex)
+
     def _run_plugin(self, effect_id, seg, sr, params):
         plugin = self._find_plugin(effect_id)
         if not plugin: return None
@@ -2117,11 +2296,42 @@ class MainWindow(QMainWindow):
 
     # ══════ Panel visibility ══════
 
+    def _on_auto_win_closed(self):
+        """Called when user closes the automation window with X."""
+        act = self._view_actions.get("automation")
+        if act and act.isChecked():
+            act.blockSignals(True)
+            act.setChecked(False)
+            act.blockSignals(False)
+
+    def _toggle_auto_window(self):
+        """Toggle automation window from the transport button."""
+        if self._auto_win.isVisible():
+            self._auto_win.hide()
+            self._on_auto_win_closed()
+        else:
+            self._auto_win.show()
+            self._auto_win.raise_()
+            self._sync_auto_audio()
+            act = self._view_actions.get("automation")
+            if act and not act.isChecked():
+                act.blockSignals(True)
+                act.setChecked(True)
+                act.blockSignals(False)
+
     def _toggle_panel(self, key, visible):
         panel_map = {
             "spectrum":       [self.spectrum],
             "effect_history": [self.effect_history],
         }
+        if key == "automation":
+            if visible:
+                self._auto_win.show()
+                self._auto_win.raise_()
+                self._sync_auto_audio()
+            else:
+                self._auto_win.hide()
+            return
         widgets = panel_map.get(key, [])
         for w in widgets:
             w.setVisible(visible)

@@ -83,7 +83,8 @@ def fade_out(audio: np.ndarray, duration_samples: int,
         return result
     curve = _make_fade_curve(n, curve_type, curvature)
     curve = start_level + curve * (end_level - start_level)
-    curve = curve[::-1].copy()
+    # curve = curve[::-1].copy()  # <--- This internal reversal was wrong because start/end logic handles direction
+
     if result.ndim == 1:
         result[-n:] *= curve
     else:

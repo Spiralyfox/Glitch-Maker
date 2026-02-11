@@ -81,10 +81,34 @@ def _w_volume(audio_data, start, end, sr=44100, **kw):
 def _w_filter(audio_data, start, end, sr=44100, **kw):
     """Wrapper : applique l effet Filter."""
     from core.effects.filter import resonant_filter
-    return resonant_filter(audio_data, start, end,
-                           filter_type=kw.get("filter_type", "lowpass"),
-                           cutoff=kw.get("cutoff_hz", 1000),
-                           resonance=kw.get("resonance", 1.0), sr=sr)
+
+    state = kw.get("plugin_state")
+    if state is not None:
+        # Stateful mode: pass zi (may be None on first call)
+        zi = state.get("filter_zi")
+        # Pass zi="init" to signal we want stateful returns even on first call
+        # resonant_filter checks `zi is not None` to decide return type
+        # So pass an empty list/zeros if we have no stored state yet
+        result = resonant_filter(audio_data, start, end,
+                                 filter_type=kw.get("filter_type", "lowpass"),
+                                 cutoff=kw.get("cutoff_hz", 1000),
+                                 resonance=kw.get("resonance", 1.0), sr=sr,
+                                 zi=zi)
+        # resonant_filter returns (array, zf) when zi is not None,
+        # or just array when zi is None (first call)
+        if isinstance(result, tuple):
+            res, zf = result
+            if zf is not None:
+                state["filter_zi"] = zf
+            return res
+        else:
+            return result
+    else:
+        # Stateless mode: simple call
+        return resonant_filter(audio_data, start, end,
+                               filter_type=kw.get("filter_type", "lowpass"),
+                               cutoff=kw.get("cutoff_hz", 1000),
+                               resonance=kw.get("resonance", 1.0), sr=sr)
 
 def _w_pan(audio_data, start, end, sr=44100, **kw):
     """Wrapper : applique l effet Pan."""

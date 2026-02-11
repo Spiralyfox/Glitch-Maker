@@ -137,6 +137,7 @@ th { background: #1a1a30; color: #a78bfa; }
 <p>Le panneau droit affiche l'historique complet de toutes vos actions, identifiées par icône et couleur :</p>
 
 <p>• 🎛 <b>Effets</b> (violet) — Effets audio. Activables/désactivables (● / ○).<br>
+• 📈 <b>Automations</b> (violet foncé) — Automations de paramètres. Activables/désactivables.<br>
 • ✂ <b>Coupes &amp; Splits</b> (orange) — Coupes silence, coupes splice, divisions.<br>
 • 🔊🔉 <b>Fondus</b> (vert) — Fade In / Fade Out sur les clips.<br>
 • ➕ <b>Ajouts</b> (bleu) — Clips ajoutés à la timeline.<br>
@@ -146,18 +147,40 @@ th { background: #1a1a30; color: #a78bfa; }
 • ↕ <b>Réorganisations</b> (gris) — Changements d'ordre.</p>
 
 <h3>Activer / Désactiver</h3>
-<p>Cliquez ● pour désactiver temporairement n'importe quelle action (effets, coupes, fondus, ajouts…). L'audio est entièrement recalculé depuis l'état initial en rejouant toutes les actions activées dans l'ordre.</p>
+<p>Cliquez ● pour désactiver temporairement n'importe quelle action (effets, automations, coupes, fondus, ajouts…). L'audio est entièrement recalculé depuis l'état initial en rejouant toutes les actions activées dans l'ordre.</p>
 
-<div class="tip">💡 <b>Mapping de coordonnées</b> — Les positions des coupes et des effets sont stockées dans l'espace de l'audio initial. Quand vous activez/désactivez des opérations qui changent la longueur (coupes splice, suppressions…), toutes les positions sont automatiquement recalculées. Les coupes et effets s'appliquent toujours exactement à la même zone audio, quel que soit l'ordre d'activation.</div>
+<div class="tip">💡 <b>Mapping de coordonnées (v7)</b> — Les positions des coupes et des effets sont stockées dans l'espace de l'audio initial. Quand vous activez/désactivez des opérations qui changent la longueur (coupes splice, suppressions…), toutes les positions sont automatiquement recalculées. Les coupes et effets s'appliquent toujours exactement à la même zone audio, quel que soit l'ordre d'activation.</div>
 
 <h3>Supprimer</h3>
 <p>Cliquez ✕ pour supprimer n'importe quelle action. Confirmation demandée. L'audio est recalculé sans cette action — les autres actions restent intactes.</p>
 
 <h3>Modifier un effet</h3>
-<p>Cliquez ✎ sur un effet dans l'historique pour rouvrir son dialogue avec les paramètres actuels. Ajustez les réglages, prévisualisez, puis validez : l'audio est entièrement recalculé avec les nouveaux paramètres. Les opérations structurelles (coupes, fondus…) ne sont pas modifiables de cette façon.</p>
+<p>Cliquez ✎ sur un effet dans l'historique pour rouvrir son dialogue avec les paramètres actuels. Ajustez les réglages, prévisualisez, puis validez : l'audio est entièrement recalculé avec les nouveaux paramètres. Les automations et les opérations structurelles (coupes, fondus…) ne sont pas modifiables de cette façon.</p>
 
 <h3>Annuler / Refaire</h3>
 <p><kbd>Ctrl+Z</kbd> annule, <kbd>Ctrl+Y</kbd> rétablit. Fonctionne pour tous les types d'actions.</p>
+
+<!-- ═══════════════════════════════════ -->
+<h2>Automations</h2>
+
+<p>Faites varier les paramètres d'effet au fil du temps. Au lieu de valeurs fixes, dessinez des courbes d'évolution sur une zone sélectionnée.</p>
+
+<p><b>Ouvrir</b> — Bouton <b>Automations</b> dans la barre de transport, ou <b>Affichage &gt; Automations</b>.</p>
+
+<h3>Créer une automation</h3>
+<p>1. Glissez sur la mini waveform pour sélectionner une zone.<br>
+2. Cliquez <b>Add Automation</b>, nommez-la, choisissez un effet.<br>
+3. Cochez les paramètres. Chaque paramètre peut être <b>Automated</b> (From → To avec courbe) ou <b>Constant</b> (valeur fixe).<br>
+4. Dessinez les courbes : clic gauche = ajouter un point, glissez = modifier, clic droit = supprimer.<br>
+5. La preview waveform en bas montre le résultat en temps réel (grise = original, violette = traité).<br>
+6. <kbd>Espace</kbd> pour prévisualiser avec barre de lecture. <b>Save</b> pour appliquer.</p>
+
+<div class="tip">💡 L'automation s'applique par-dessus les effets déjà dans votre chaîne.</div>
+
+<h3>Gérer</h3>
+<p><b>ON/OFF</b> — Désactivez/réactivez. <b>Edit</b> — Rouvrez l'éditeur. <b>Del</b> — Supprimez. <b>Redefine region</b> — Changez la zone sans fermer l'éditeur.</p>
+
+<div class="audio-desc">🔊 Exemples : Filter Cutoff de 200 Hz à 8000 Hz avec Resonance constante = ouverture cinématique. Bitcrusher Bit Depth à 8, Downsample de 1 à 32 = désintégration progressive. Volume 100 % → 0 % = fade-out personnalisé avec contrôle total de la courbe.</div>
 
 <!-- ═══════════════════════════════════ -->
 <h2>Effets — Référence complète</h2>
@@ -179,7 +202,7 @@ th { background: #1a1a30; color: #a78bfa; }
 <div class="audio-desc">🔊 Passe-bas = son étouffé. Passe-haut = son fin. Passe-bande = effet téléphone. Résonance haute = sifflement à la coupure.</div>
 
 <p><b>Pan / Stéréo</b> — Position dans le champ stéréo.</p>
-<div class="audio-desc">🔊 Pan gauche/droite. Utilisé sur un segment = sensation de décalage spatial entre les oreilles.</div>
+<div class="audio-desc">🔊 Pan gauche/droite. Automatiser = sensation de mouvement d'une oreille à l'autre.</div>
 
 <!-- ── Pitch & Time ── -->
 <h3>🎵 Pitch &amp; Time</h3>
