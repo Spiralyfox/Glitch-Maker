@@ -24,7 +24,7 @@ from gui.spectrum_widget import SpectrumWidget
 from gui.minimap_widget import MinimapWidget
 from gui.effect_history import EffectHistoryPanel
 from gui.progress_overlay import ProgressOverlay
-from gui.automation_window import AutomationWindow
+
 
 from core.audio_engine import (
     load_audio, export_audio, ensure_stereo, get_duration, format_time,
@@ -63,6 +63,134 @@ class _EffectWorker(QThread):
             self.done.emit(result)
         except Exception as e:
             self.error.emit(str(e))
+
+
+# ═══ Coordinate conversion for history replay (v7) ═══
+
+class _ReplayOffsetTracker:
+    """Tracks audio-length changes during history replay to convert
+    between initial-space and current-space sample positions.
+
+    Problem solved:
+        When structural ops (cut_splice, delete_clip) remove audio,
+        positions of subsequent ops shift.  If a preceding op is
+        disabled during replay, those stored positions now point to
+        wrong audio content.
+
+    Solution:
+        Store all positions in *initial-space* (relative to the
+        original untouched audio).  During replay, this tracker
+        accumulates removals as each enabled op is replayed, and
+        provides conversion:
+
+        * initial_to_current(pos)  – for replaying an op
+        * current_to_initial(pos)  – for recording a new op
+
+    Usage in _render_from_ops():
+        tracker = _ReplayOffsetTracker()
+        for op in enabled_ops:
+            if cut_splice:
+                s, e = tracker.initial_range_to_current(init_s, init_e)
+                ... apply cut at (s, e) ...
+                tracker.register_remove(init_s, init_e)
+            elif effect:
+                s, e = tracker.initial_range_to_current(init_s, init_e)
+                ... apply effect at (s, e) ...
+    """
+
+    __slots__ = ("_removes",)
+
+    def __init__(self):
+        # Sorted list of (init_start, init_end) ranges that have been
+        # spliced out of the initial audio.  Non-overlapping, ascending.
+        self._removes: list[tuple[int, int]] = []
+
+    def reset(self):
+        """Clear all tracked removals (call at start of each replay)."""
+        self._removes.clear()
+
+    # ── Register edits ──
+
+    def register_remove(self, init_start: int, init_end: int):
+        """Record that initial-space samples [init_start, init_end) were
+        spliced out (cut_splice or delete_clip)."""
+        import bisect
+        bisect.insort(self._removes, (init_start, init_end))
+
+    # ── Initial → Current (used during replay) ──
+
+    def initial_to_current(self, init_pos: int) -> int:
+        """Convert an initial-space sample position to current-space.
+
+        For each registered removal before init_pos, subtract its length.
+        Positions inside a removed range are clamped to the left edge.
+
+        Example:
+            Audio 20 samples.  Removal [4,8] registered.
+            initial_to_current(0)  → 0   (before removal)
+            initial_to_current(8)  → 4   (after removal, shifted left by 4)
+            initial_to_current(5)  → 4   (inside removal, clamped)
+        """
+        removed_before = 0
+        for s, e in self._removes:
+            if init_pos <= s:
+                break
+            elif init_pos >= e:
+                removed_before += (e - s)
+            else:
+                # Inside a removed range – clamp to its left edge
+                return s - removed_before
+        return init_pos - removed_before
+
+    def initial_range_to_current(self, init_start: int, init_end: int) -> tuple[int, int]:
+        """Convert an initial-space [start, end) range to current-space."""
+        return (self.initial_to_current(init_start),
+                self.initial_to_current(init_end))
+
+    # ── Current → Initial (used when recording a new op) ──
+
+    def current_to_initial(self, cur_pos: int) -> int:
+        """Convert a current-space sample position to initial-space.
+
+        Reverses the effect of all registered removals by adding back
+        removed lengths.
+
+        Example:
+            Audio 20 samples.  Removal [4,8] registered.
+            current_to_initial(0)  → 0   (before removal)
+            current_to_initial(4)  → 8   (was shifted left by 4)
+            current_to_initial(12) → 16  (shifted left by 4)
+        """
+        init_pos = cur_pos
+        for s, e in self._removes:
+            if init_pos < s:
+                break
+            init_pos += (e - s)
+        return init_pos
+
+    def current_range_to_initial(self, cur_start: int, cur_end: int) -> tuple[int, int]:
+        """Convert a current-space [start, end) range to initial-space."""
+        return (self.current_to_initial(cur_start),
+                self.current_to_initial(cur_end))
+
+    # ── Bulk build (for recording context) ──
+
+    def build_from_ops(self, ops: list[dict]):
+        """Rebuild the offset map from all enabled cut_splice ops.
+
+        Called before recording a new op, so current_to_initial() can
+        convert the user's selection into initial-space coordinates.
+        """
+        self.reset()
+        for op in ops:
+            if not op.get("enabled", True):
+                continue
+            if op.get("type") == "cut_splice":
+                rd = op.get("_replay", {})
+                s = rd.get("init_start")
+                e = rd.get("init_end")
+                if s is not None and e is not None:
+                    self.register_remove(s, e)
 
 
 class _FFmpegDownloadThread(QThread):
@@ -112,6 +240,7 @@ class MainWindow(QMainWindow):
         self._ops_redo: list[dict] = []                 # redo stack
         self._initial_base_audio: np.ndarray | None = None  # audio at project start
         self._initial_clips: list = []                       # clips at project start
+        self._offset_tracker = _ReplayOffsetTracker()        # coordinate conversion for replay (v7)
         self._clip_color_idx = 0                        # for different clip colors
 
         # Load effect plugins
@@ -312,10 +441,6 @@ class MainWindow(QMainWindow):
         self.progress_overlay = ProgressOverlay(center)
         self.progress_overlay.setVisible(False)
 
-        # Automation window (floating, hidden by default)
-        self._auto_win = AutomationWindow(self._plugins, parent=self)
-        self._auto_win.hide()
-
     def _make_toolbar_btn(self, text):
         b = QPushButton(text); b.setFixedHeight(26)
         b.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -356,7 +481,6 @@ class MainWindow(QMainWindow):
         panels = [
             ("spectrum",        t("view.spectrum"),      False),
             ("effect_history",  t("view.history"),       True),
-            ("automation",      "Automations",           False),
         ]
         for key, label, default_on in panels:
             act = QAction(label, self)
@@ -456,18 +580,7 @@ class MainWindow(QMainWindow):
         # v4.4: non-destructive ops signals
         self.effect_history.op_deleted.connect(self._delete_op)
         self.effect_history.op_toggled.connect(self._toggle_op)
-
-        # Automation window signals
-        self._auto_win.automation_added.connect(self._add_automation)
-        self._auto_win.automation_edited.connect(self._edit_automation)
-        self._auto_win.automation_deleted.connect(self._delete_op)
-        self._auto_win.automation_toggled.connect(self._toggle_op)
-        self._auto_win.preview_requested.connect(self._preview_automation)
-        self._auto_win.preview_base_requested.connect(self._preview_base_region)
-        self._auto_win.stop_requested.connect(self._stop)
-        self._auto_win.window_closed.connect(self._on_auto_win_closed)
-        self._auto_win.set_playback_engine(self.playback)
-        self.transport.automations_clicked.connect(self._toggle_auto_window)
+        self.effect_history.op_edit_clicked.connect(self._edit_effect_op)
 
     def _update_undo_labels(self):
         has_u = bool(self._ops_undo)
@@ -1133,13 +1246,20 @@ class MainWindow(QMainWindow):
             name = plugin.get_name(get_language())
             self._last_params[effect_id] = dict(params)
 
-            # Create op
+            # Create op — convert positions to initial-space (v7)
+            if not is_global and s is not None and e is not None:
+                self._offset_tracker.build_from_ops(self._effect_ops)
+                init_s, init_e = self._offset_tracker.current_range_to_initial(s, e)
+            else:
+                init_s, init_e = None, None
             op = {
                 "uid": str(uuid.uuid4())[:8],
                 "effect_id": effect_id,
                 "params": dict(params),
                 "start": s if not is_global else 0,
                 "end": e if not is_global else len(self.audio_data),
+                "init_start": init_s,
+                "init_end": init_e,
                 "is_global": is_global,
                 "enabled": True,
                 "timestamp": datetime.now().strftime("%d/%m %H:%M:%S"),
@@ -1171,11 +1291,6 @@ class MainWindow(QMainWindow):
         """Apply a single op on current audio_data (fast, for new ops)."""
         if not op.get("enabled", True) or self.audio_data is None:
             return
-        if op.get("type") == "automation":
-            self._render_auto_op(op)
-            self._update_clips_from_audio()
-            self._refresh_all()
-            return
         plugin = self._find_plugin(op["effect_id"])
         if not plugin: return
         s = op.get("start", 0)
@@ -1204,8 +1319,9 @@ class MainWindow(QMainWindow):
 
     def _render_from_ops(self):
         """Re-render audio by replaying ALL enabled ops from the initial state.
-        Structural ops are replayed via _replay_structural_op(),
-        effects and automations are applied on the resulting audio."""
+        Uses _ReplayOffsetTracker (v7) to convert initial-space coordinates
+        to current-space so that positions stay correct even when ops are
+        toggled on/off."""
         # Step 1: Restore the initial state (before any ops)
         if self._initial_base_audio is not None:
             self._restore_initial_state()
@@ -1219,29 +1335,43 @@ class MainWindow(QMainWindow):
         if self.audio_data is None:
             return
 
-        # Step 2: Replay all enabled ops in order
+        # Step 2: Reset the offset tracker for this replay pass
+        self._offset_tracker.reset()
+
+        # Step 3: Replay all enabled ops in order
         for op in self._effect_ops:
             if not op.get("enabled", True):
                 continue
 
             op_type = op.get("type", "effect")
 
-            # Structural ops → replay from _replay data
+            # ── Structural ops → replay from _replay data ──
             if op_type in self._STRUCTURAL_TYPES:
-                if not self._replay_structural_op(op):
+                replay_op = op
+                rd = op.get("_replay", {})
+
+                # Convert init-space → current-space for position-based ops (v7)
+                if op_type in ("cut_splice", "cut_silence"):
+                    init_s = rd.get("init_start")
+                    init_e = rd.get("init_end")
+                    if init_s is not None and init_e is not None:
+                        cur_s, cur_e = self._offset_tracker.initial_range_to_current(init_s, init_e)
+                        # Create a shallow copy with converted positions (don't mutate stored op)
+                        rd_copy = dict(rd, sel_start=cur_s, sel_end=cur_e)
+                        replay_op = dict(op, _replay=rd_copy)
+
+                if not self._replay_structural_op(replay_op):
                     _log.warning("Replay skipped (failed): %s", op.get("name"))
-                # After replay, audio_data is already updated by _rebuild_audio
-                # inside _replay_structural_op, so just continue
+                else:
+                    # Register removal in tracker so subsequent ops get correct offsets
+                    if op_type == "cut_splice":
+                        init_s = rd.get("init_start")
+                        init_e = rd.get("init_end")
+                        if init_s is not None and init_e is not None:
+                            self._offset_tracker.register_remove(init_s, init_e)
                 continue
 
-            # Automation ops
-            if op_type == "automation":
-                self._render_auto_op(op)
-                # Sync modified audio back to clips so next structural op sees changes
-                self._update_clips_from_audio()
-                continue
-
-            # Effect ops
+            # ── Effect ops ──
             plugin = self._find_plugin(op.get("effect_id"))
             if not plugin:
                 continue
@@ -1249,8 +1379,15 @@ class MainWindow(QMainWindow):
                 s = 0
                 e = len(self.audio_data)
             else:
-                s = op.get("start", 0)
-                e = op.get("end", len(self.audio_data))
+                # Use initial-space coordinates if available (v7)
+                init_s = op.get("init_start")
+                init_e = op.get("init_end")
+                if init_s is not None and init_e is not None:
+                    s, e = self._offset_tracker.initial_range_to_current(init_s, init_e)
+                else:
+                    # Backward compat: use stored current-space positions
+                    s = op.get("start", 0)
+                    e = op.get("end", len(self.audio_data))
                 s = max(0, min(s, len(self.audio_data)))
                 e = max(s, min(e, len(self.audio_data)))
             if e - s < 1:
@@ -1277,38 +1414,9 @@ class MainWindow(QMainWindow):
         self._update_clips_from_audio()
         self._refresh_all()
 
-    def _render_auto_op(self, op):
-        """Render a single automation op on self.audio_data (multi-param)."""
-        from core.automation import apply_automation_multi
-        plugin = self._find_plugin(op.get("effect_id"))
-        if not plugin:
-            return
-        n = len(self.audio_data)
-        s = op.get("start") or 0
-        e = op.get("end") or n
-        s = max(0, min(int(s), n))
-        e = max(s, min(int(e), n))
-        if e - s < 1:
-            return
-        auto_params = op.get("auto_params", [])
-        # Legacy single-param fallback
-        if not auto_params and op.get("auto_param"):
-            auto_params = [{"key": op["auto_param"], "mode": "automated",
-                            "default_val": op.get("auto_default", 0),
-                            "target_val": op.get("auto_target", 1),
-                            "curve_points": op.get("curve_points", [(0, 0), (1, 1)])}]
-        if not auto_params:
-            return
-        try:
-            self.audio_data = apply_automation_multi(
-                self.audio_data, s, e,
-                plugin.process_fn, auto_params, self.sample_rate)
-        except Exception as ex:
-            _log.warning("Automation render %s failed: %s", op.get("name"), ex)
-
     def _delete_op(self, uid):
         """Delete any op by uid and re-render from initial state.
-        All op types (structural, effect, automation) are treated equally."""
+        All op types (structural and effect) are treated equally."""
         idx = next((i for i, o in enumerate(self._effect_ops) if o.get("uid") == uid), None)
         if idx is None:
             return
@@ -1341,6 +1449,81 @@ class MainWindow(QMainWindow):
         state = "ON" if op["enabled"] else "OFF"
         self.statusBar().showMessage(f"{op['name']} : {state}")
 
+    def _edit_effect_op(self, uid):
+        """Open the effect dialog pre-filled with existing params to edit an effect op."""
+        op = next((o for o in self._effect_ops if o.get("uid") == uid), None)
+        if op is None:
+            return
+        # Only allow editing non-structural ops
+        if op.get("type", "effect") in self._STRUCTURAL_TYPES:
+            return
+        plugin = self._find_plugin(op.get("effect_id"))
+        if not plugin:
+            QMessageBox.warning(self, APP_NAME, t("history.edit_no_plugin"))
+            return
+
+        try:
+            if self.playback.is_playing:
+                self._stop()
+            self.playback.suspend_stream()
+        except Exception:
+            pass
+
+        try:
+            # Determine preview segment from the op's stored range
+            is_global = op.get("is_global", False)
+            if is_global:
+                preview_seg = self.audio_data
+            else:
+                s = op.get("start", 0)
+                e = op.get("end", len(self.audio_data))
+                s = max(0, min(s, len(self.audio_data)))
+                e = max(s, min(e, len(self.audio_data)))
+                preview_seg = self.audio_data[s:e] if e - s > 0 else self.audio_data
+
+            # Open dialog pre-filled with current params
+            d = plugin.dialog_class(self)
+            d.set_params(op.get("params", {}))
+            if preview_seg is not None and len(preview_seg) > 0:
+                try:
+                    d.setup_preview(preview_seg, self.sample_rate, plugin.process_fn,
+                                    output_device=self.playback.output_device)
+                except Exception as pe:
+                    _log.warning("Preview setup failed: %s", pe)
+
+            accepted = d.exec() == d.DialogCode.Accepted
+            try:
+                self.playback.resume_stream()
+            except Exception:
+                pass
+            if not accepted:
+                return
+
+            new_params = d.get_params()
+            # Check if params actually changed
+            if new_params == op.get("params", {}):
+                return
+
+            # Apply changes
+            self._push_undo(f"Edit: {op['name']}")
+            op["params"] = dict(new_params)
+            op["timestamp"] = datetime.now().strftime("%d/%m %H:%M:%S")
+
+            # Full re-render to apply updated params correctly
+            self._render_from_ops()
+            self._sync_history_chain()
+            self._unsaved = True
+            self.statusBar().showMessage(t("status.effect_edited").format(name=op["name"]))
+
+        except Exception as e:
+            _log.error("Edit effect error (%s): %s", uid, e, exc_info=True)
+            try:
+                self.playback.resume_stream()
+            except Exception:
+                pass
+            QMessageBox.critical(self, APP_NAME,
+                                 f"{t('error.effect_failed')}\n{e}")
+
     def _move_op(self, uid, direction):
         """Move any op up or down in the chain and re-render."""
         idx = next((i for i, o in enumerate(self._effect_ops) if o.get("uid") == uid), None)
@@ -1356,21 +1539,8 @@ class MainWindow(QMainWindow):
         self._unsaved = True
 
     def _sync_history_chain(self):
-        """Sync history panel and automation window with current ops."""
+        """Sync history panel with current ops."""
         self.effect_history.set_ops(self._effect_ops)
-        if self._auto_win.isVisible():
-            self._auto_win.set_automations(self._effect_ops)
-            audio = self.audio_data if self.audio_data is not None else self._base_audio
-            if audio is not None:
-                self._auto_win.set_audio(audio, self.sample_rate)
-
-    def _sync_auto_audio(self):
-        """Push current rendered audio to the automation window.
-        Uses the fully-rendered audio_data so the preview reflects prior effects."""
-        audio = self.audio_data if self.audio_data is not None else self._base_audio
-        if audio is not None:
-            self._auto_win.set_audio(audio, self.sample_rate)
-            self._auto_win.set_automations(self._effect_ops)
 
     # ── Structural ops helpers ──
 
@@ -1384,6 +1554,7 @@ class MainWindow(QMainWindow):
         clips = []
         for c in self.timeline.clips:
             clips.append({
+                "id": c.id,
                 "name": c.name,
                 "data": c.audio_data.copy(),
                 "position": c.position,
@@ -1408,6 +1579,8 @@ class MainWindow(QMainWindow):
             c = AudioClip(name=cd["name"], audio_data=cd["data"].copy(),
                           sample_rate=self.sample_rate,
                           position=cd["position"], color=cd["color"])
+            if "id" in cd:
+                c.id = cd["id"]  # Preserve original ID (v7)
             c.fade_in_params = cd.get("fade_in_params", {})
             c.fade_out_params = cd.get("fade_out_params", {})
             c._audio_before_fade_in = cd["bfi"].copy() if cd.get("bfi") is not None else None
@@ -1420,6 +1593,7 @@ class MainWindow(QMainWindow):
         self._initial_clips = []
         for c in self.timeline.clips:
             self._initial_clips.append({
+                "id": c.id,
                 "name": c.name,
                 "data": c.audio_data.copy(),
                 "position": c.position,
@@ -1440,6 +1614,8 @@ class MainWindow(QMainWindow):
             c = AudioClip(name=cd["name"], audio_data=cd["data"].copy(),
                           sample_rate=self.sample_rate,
                           position=cd["position"], color=cd["color"])
+            if "id" in cd:
+                c.id = cd["id"]  # Preserve original ID for replay lookup (v7)
             c.fade_in_params = cd.get("fade_in_params", {})
             c.fade_out_params = cd.get("fade_out_params", {})
             c._audio_before_fade_in = cd["bfi"].copy() if cd.get("bfi") is not None else None
@@ -1496,6 +1672,23 @@ class MainWindow(QMainWindow):
         except Exception as ex:
             _log.warning("Replay %s failed: %s", op_type, ex)
             return False
+
+    # ── Clip resolution helper (v7) ──
+
+    @staticmethod
+    def _resolve_clip_idx(clips, rd, key_id="clip_id", key_idx="clip_index"):
+        """Find clip index by stored clip_id (preferred) or clip_index (fallback).
+        Returns index or -1 if not found."""
+        cid = rd.get(key_id)
+        if cid is not None:
+            for i, c in enumerate(clips):
+                if c.id == cid:
+                    return i
+        # Fallback to stored index (backward compat or ID mismatch)
+        idx = rd.get(key_idx)
+        if idx is not None and 0 <= idx < len(clips):
+            return idx
+        return -1
 
     # ── Individual replay methods ──
 
@@ -1596,11 +1789,9 @@ class MainWindow(QMainWindow):
 
     def _replay_split(self, rd, clips):
         """Replay split on current clips."""
-        idx = rd.get("clip_index")
+        idx = self._resolve_clip_idx(clips, rd)
         local_pos = rd.get("local_pos")
-        if idx is None or local_pos is None:
-            return False
-        if idx < 0 or idx >= len(clips):
+        if idx < 0 or local_pos is None:
             return False
         clip = clips[idx]
         if local_pos <= 0 or local_pos >= clip.duration_samples:
@@ -1622,8 +1813,8 @@ class MainWindow(QMainWindow):
 
     def _replay_duplicate(self, rd, clips):
         """Replay duplicate on current clips."""
-        idx = rd.get("clip_index")
-        if idx is None or idx < 0 or idx >= len(clips):
+        idx = self._resolve_clip_idx(clips, rd)
+        if idx < 0:
             return False
         clip = clips[idx]
         color = _generate_distinct_color(self.timeline._color_counter)
@@ -1638,8 +1829,8 @@ class MainWindow(QMainWindow):
 
     def _replay_delete_clip(self, rd, clips):
         """Replay delete clip on current clips."""
-        idx = rd.get("clip_index")
-        if idx is None or idx < 0 or idx >= len(clips):
+        idx = self._resolve_clip_idx(clips, rd)
+        if idx < 0:
             return False
         if len(clips) <= 1:
             return False
@@ -1654,16 +1845,27 @@ class MainWindow(QMainWindow):
 
     def _replay_reorder(self, rd, clips):
         """Replay reorder on current clips."""
-        src = rd.get("src_idx")
+        # Find source clip by ID (v7), fallback to index
+        src_clip_id = rd.get("src_clip_id")
+        src = None
+        if src_clip_id is not None:
+            for i, c in enumerate(clips):
+                if c.id == src_clip_id:
+                    src = i
+                    break
+        if src is None:
+            src = rd.get("src_idx")
         tgt = rd.get("tgt_idx")
         if src is None or tgt is None:
             return False
-        if src < 0 or src >= len(clips) or tgt < 0 or tgt >= len(clips):
+        if src < 0 or src >= len(clips):
             return False
+        tgt = max(0, min(tgt, len(clips) - 1))
         clip = clips.pop(src)
         insert_at = tgt
         if src < tgt:
             insert_at -= 1
+        insert_at = max(0, min(insert_at, len(clips)))
         clips.insert(insert_at, clip)
         pos = 0
         for c in clips:
@@ -1675,9 +1877,9 @@ class MainWindow(QMainWindow):
 
     def _replay_fade_in(self, rd, clips):
         """Replay fade-in on current clips."""
-        idx = rd.get("clip_index")
+        idx = self._resolve_clip_idx(clips, rd)
         params = rd.get("params")
-        if idx is None or params is None or idx < 0 or idx >= len(clips):
+        if idx < 0 or params is None:
             return False
         clip = clips[idx]
         # Store original for future re-edits
@@ -1694,9 +1896,9 @@ class MainWindow(QMainWindow):
 
     def _replay_fade_out(self, rd, clips):
         """Replay fade-out on current clips."""
-        idx = rd.get("clip_index")
+        idx = self._resolve_clip_idx(clips, rd)
         params = rd.get("params")
-        if idx is None or params is None or idx < 0 or idx >= len(clips):
+        if idx < 0 or params is None:
             return False
         clip = clips[idx]
         # Store original for future re-edits
@@ -1725,69 +1927,6 @@ class MainWindow(QMainWindow):
         self._rebuild_audio()
         self._base_audio = self.audio_data.copy() if self.audio_data is not None else None
         return True
-
-    def _add_automation(self, op):
-        """Add a new automation as an effect op."""
-        import uuid as _uuid
-        op["uid"] = str(_uuid.uuid4())[:8]
-        op["enabled"] = True
-        op["is_global"] = False
-        op["color"] = "#7c3aed"
-        op["timestamp"] = datetime.now().strftime("%d/%m %H:%M:%S")
-        op["params"] = {}
-        self._add_op(op)
-
-    def _edit_automation(self, op):
-        """Edit an existing automation op (multi-param)."""
-        uid = op.get("uid")
-        existing = next((o for o in self._effect_ops if o.get("uid") == uid), None)
-        if existing is None:
-            return
-        self._push_undo(f"Edit: {op.get('name', 'Automation')}")
-        for k in ("name", "effect_id", "auto_params", "start", "end"):
-            if k in op:
-                existing[k] = op[k]
-        self._render_from_ops()
-        self._sync_history_chain()
-        self._unsaved = True
-
-    def _preview_automation(self, config, start, end):
-        """Preview a multi-param automation on the current audio (with all prior effects)."""
-        if self.audio_data is None:
-            return
-        from core.automation import apply_automation_multi
-        plugin = self._find_plugin(config.get("effect_id"))
-        if not plugin:
-            return
-        auto_params = config.get("auto_params", [])
-        if not auto_params:
-            return
-        try:
-            preview = self.audio_data.copy()
-            s = max(0, min(start, len(preview)))
-            e = max(s, min(end, len(preview)))
-            if e - s > 0:
-                preview = apply_automation_multi(
-                    preview, s, e,
-                    plugin.process_fn, auto_params, self.sample_rate)
-            self.playback.load(preview, self.sample_rate)
-            self.playback.play_selection(s, e)
-        except Exception as ex:
-            _log.error("Automation preview error: %s", ex, exc_info=True)
-
-    def _preview_base_region(self, start, end):
-        """Play the current audio in a given region (no additional automation)."""
-        audio = self.audio_data if self.audio_data is not None else self._base_audio
-        if audio is None:
-            return
-        try:
-            s = max(0, min(start, len(audio)))
-            e = max(s, min(end, len(audio)))
-            if e - s > 0:
-                self.playback.load(audio, self.sample_rate)
-                self.playback.play_selection(s, e)
-        except Exception as ex:
-            _log.error("Base preview error: %s", ex)
 
     def _run_plugin(self, effect_id, seg, sr, params):
         plugin = self._find_plugin(effect_id)
@@ -1840,6 +1979,9 @@ class MainWindow(QMainWindow):
         if not preset: return
         s, e = self._sel_range()
         if s is None: s, e = 0, len(self.audio_data)
+        # Convert to initial-space (v7)
+        self._offset_tracker.build_from_ops(self._effect_ops)
+        init_s, init_e = self._offset_tracker.current_range_to_initial(s, e)
         self._push_undo(f"Preset: {name}")
         self._set_busy(True, f"Preset: {name}")
         QApplication.processEvents()
@@ -1854,6 +1996,7 @@ class MainWindow(QMainWindow):
                     "effect_id": plugin.id,
                     "params": params,
                     "start": s, "end": e,
+                    "init_start": init_s, "init_end": init_e,
                     "is_global": False, "enabled": True,
                     "timestamp": datetime.now().strftime("%d/%m %H:%M:%S"),
                     "name": f"{plugin.get_name(get_language())} ({name})",
@@ -1920,11 +2063,15 @@ class MainWindow(QMainWindow):
         if s is None:
             QMessageBox.warning(self, APP_NAME, t("quick_apply.no_selection")); return
         name = plugin.get_name(get_language())
+        # Convert to initial-space (v7)
+        self._offset_tracker.build_from_ops(self._effect_ops)
+        init_s, init_e = self._offset_tracker.current_range_to_initial(s, e)
         op = {
             "uid": str(uuid.uuid4())[:8],
             "effect_id": effect_id,
             "params": dict(params),
             "start": s, "end": e,
+            "init_start": init_s, "init_end": init_e,
             "is_global": False, "enabled": True,
             "timestamp": datetime.now().strftime("%d/%m %H:%M:%S"),
             "name": f"{name} ⚡", "color": plugin.color,
@@ -1970,42 +2117,11 @@ class MainWindow(QMainWindow):
 
     # ══════ Panel visibility ══════
 
-    def _on_auto_win_closed(self):
-        """Called when user closes the automation window with X."""
-        act = self._view_actions.get("automation")
-        if act and act.isChecked():
-            act.blockSignals(True)
-            act.setChecked(False)
-            act.blockSignals(False)
-
-    def _toggle_auto_window(self):
-        """Toggle automation window from the transport button."""
-        if self._auto_win.isVisible():
-            self._auto_win.hide()
-            self._on_auto_win_closed()
-        else:
-            self._auto_win.show()
-            self._auto_win.raise_()
-            self._sync_auto_audio()
-            act = self._view_actions.get("automation")
-            if act and not act.isChecked():
-                act.blockSignals(True)
-                act.setChecked(True)
-                act.blockSignals(False)
-
     def _toggle_panel(self, key, visible):
         panel_map = {
             "spectrum":       [self.spectrum],
             "effect_history": [self.effect_history],
         }
-        if key == "automation":
-            if visible:
-                self._auto_win.show()
-                self._auto_win.raise_()
-                self._sync_auto_audio()
-            else:
-                self._auto_win.hide()
-            return
         widgets = panel_map.get(key, [])
         for w in widgets:
             w.setVisible(visible)
@@ -2014,10 +2130,17 @@ class MainWindow(QMainWindow):
 
     def _on_reorder(self, src_idx, tgt_idx):
         self._push_undo("Reorder")
+        # Capture clip ID of the moved clip (v7)
+        # After reorder: clip is at adjusted position
+        actual_pos = (tgt_idx - 1) if src_idx < tgt_idx else tgt_idx
+        src_clip_id = None
+        if 0 <= actual_pos < len(self.timeline.clips):
+            src_clip_id = self.timeline.clips[actual_pos].id
         self._rebuild_audio()
         self._base_audio = self.audio_data.copy() if self.audio_data is not None else None
         self._add_structural_op("reorder", "↕ Reorder",
-                                replay_data={"src_idx": src_idx, "tgt_idx": tgt_idx})
+                                replay_data={"src_idx": src_idx, "tgt_idx": tgt_idx,
+                                             "src_clip_id": src_clip_id})
         self._unsaved = True
 
     def _split_clip(self, cid, pos):
@@ -2041,7 +2164,8 @@ class MainWindow(QMainWindow):
         self._rebuild_audio()
         self._base_audio = self.audio_data.copy() if self.audio_data is not None else None
         self._add_structural_op("split", f"✂ Split ({clip.name})",
-                                replay_data={"clip_index": idx, "local_pos": local})
+                                replay_data={"clip_index": idx, "clip_id": clip.id,
+                                             "local_pos": local})
         self._unsaved = True
 
     def _dup_clip(self, cid):
@@ -2058,7 +2182,7 @@ class MainWindow(QMainWindow):
         self._rebuild_audio()
         self._base_audio = self.audio_data.copy() if self.audio_data is not None else None
         self._add_structural_op("duplicate", f"📋 Duplicate ({clip.name})",
-                                replay_data={"clip_index": idx})
+                                replay_data={"clip_index": idx, "clip_id": clip.id})
         self._unsaved = True
 
     def _del_clip(self, cid):
@@ -2082,7 +2206,7 @@ class MainWindow(QMainWindow):
             self._rebuild_audio()
             self._base_audio = self.audio_data.copy() if self.audio_data is not None else None
             self._add_structural_op("delete_clip", f"🗑 {clip_name}",
-                                    replay_data={"clip_index": clip_idx})
+                                    replay_data={"clip_index": clip_idx, "clip_id": clip.id})
             self._refresh_all()
             self._unsaved = True
         except Exception as e:
@@ -2148,8 +2272,12 @@ class MainWindow(QMainWindow):
             pos += c.duration_samples
         self._rebuild_audio()
         self._base_audio = self.audio_data.copy() if self.audio_data is not None else None
+        # Convert to initial-space coordinates for replay stability (v7)
+        self._offset_tracker.build_from_ops(self._effect_ops)
+        init_start, init_end = self._offset_tracker.current_range_to_initial(sel_start, sel_end)
         self._add_structural_op("cut_silence", "✂ Cut (silence)",
-                                replay_data={"sel_start": sel_start, "sel_end": sel_end})
+                                replay_data={"sel_start": sel_start, "sel_end": sel_end,
+                                             "init_start": init_start, "init_end": init_end})
         self.waveform.clear_selection()
         self._unsaved = True
 
@@ -2210,8 +2338,12 @@ class MainWindow(QMainWindow):
             pos += c.duration_samples
         self._rebuild_audio()
         self._base_audio = self.audio_data.copy() if self.audio_data is not None else None
+        # Convert to initial-space coordinates for replay stability (v7)
+        self._offset_tracker.build_from_ops(self._effect_ops)
+        init_start, init_end = self._offset_tracker.current_range_to_initial(sel_start, sel_end)
         self._add_structural_op("cut_splice", "✂ Cut (splice)",
-                                replay_data={"sel_start": sel_start, "sel_end": sel_end})
+                                replay_data={"sel_start": sel_start, "sel_end": sel_end,
+                                             "init_start": init_start, "init_end": init_end})
         self.waveform.clear_selection()
         self._unsaved = True
 
@@ -2257,7 +2389,8 @@ class MainWindow(QMainWindow):
         self._rebuild_audio()
         self._base_audio = self.audio_data.copy() if self.audio_data is not None else None
         self._add_structural_op("fade_in", f"🔊 Fade In ({clip.name})",
-                                replay_data={"clip_index": clip_idx, "params": params})
+                                replay_data={"clip_index": clip_idx, "clip_id": clip.id,
+                                             "params": params})
         if self._effect_ops and any(op.get("type", "effect") not in self._STRUCTURAL_TYPES for op in self._effect_ops):
             self._render_from_ops()
         self._unsaved = True
@@ -2304,7 +2437,8 @@ class MainWindow(QMainWindow):
         self._rebuild_audio()
         self._base_audio = self.audio_data.copy() if self.audio_data is not None else None
         self._add_structural_op("fade_out", f"🔉 Fade Out ({clip.name})",
-                                replay_data={"clip_index": clip_idx, "params": params})
+                                replay_data={"clip_index": clip_idx, "clip_id": clip.id,
+                                             "params": params})
         if self._effect_ops and any(op.get("type", "effect") not in self._STRUCTURAL_TYPES for op in self._effect_ops):
             self._render_from_ops()
         self._unsaved = True

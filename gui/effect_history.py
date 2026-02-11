@@ -1,6 +1,6 @@
 """History panel — Right sidebar.
-Displays all actions (effects, cuts, fades, recordings, clip adds, automations, etc.)
-with toggle and individual delete. All action types are treated equally:
+Displays all actions (effects, cuts, fades, recordings, clip adds, etc.)
+with toggle, edit and individual delete. All action types are treated equally:
 every op can be toggled on/off or deleted independently.
 """
 from PyQt6.QtWidgets import (
@@ -15,7 +15,6 @@ from utils.translator import t
 # ── Action type metadata: icon, default color ──
 _ACTION_META = {
     "effect":       ("🎛", "#6c5ce7"),
-    "automation":   ("📈", "#7c3aed"),
     "cut_silence":  ("✂", "#e17055"),
     "cut_splice":   ("✂", "#e17055"),
     "fade_in":      ("🔊", "#00b894"),
@@ -62,9 +61,10 @@ def _get_scope_label(op: dict) -> str:
 class _HistItem(QWidget):
     delete_clicked = pyqtSignal(str)
     toggle_clicked = pyqtSignal(str)
+    edit_clicked = pyqtSignal(str)
 
     def __init__(self, uid, index, name, scope, color="#6c5ce7",
-                 timestamp="", enabled=True, icon="🎛", parent=None):
+                 timestamp="", enabled=True, icon="🎛", editable=False, parent=None):
         super().__init__(parent)
         self._uid = uid; self._color = color; self._hovered = False
         self.setFixedHeight(44); self.setMinimumWidth(180)
@@ -105,6 +105,17 @@ class _HistItem(QWidget):
             col.addWidget(meta)
         lo.addLayout(col, stretch=1)
 
+        # Edit button (only for editable ops — effects)
+        if editable:
+            btn_e = QPushButton("✎"); btn_e.setFixedSize(22, 22)
+            btn_e.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+            btn_e.setToolTip(t("history.edit_tip"))
+            btn_e.setStyleSheet(
+                f"QPushButton {{ background: transparent; color: {C['text_dim']}; border: none; font-size: 13px; }}"
+                f"QPushButton:hover {{ color: {COLORS['accent']}; }}")
+            btn_e.clicked.connect(lambda: self.edit_clicked.emit(self._uid))
+            lo.addWidget(btn_e)
+
         # Delete button
         btn_d = QPushButton("✕"); btn_d.setFixedSize(22, 22)
         btn_d.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
@@ -129,9 +140,10 @@ class _HistItem(QWidget):
 
 
 class EffectHistoryPanel(QWidget):
-    """Right sidebar — displays all actions with toggle/delete."""
+    """Right sidebar — displays all actions with toggle/delete/edit."""
     op_deleted = pyqtSignal(str)
     op_toggled = pyqtSignal(str)
+    op_edit_clicked = pyqtSignal(str)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -196,6 +208,10 @@ class EffectHistoryPanel(QWidget):
             icon = _get_action_icon(op)
             color = _get_action_color(op)
             scope = _get_scope_label(op)
+            # Effects (not structural) are editable
+            action_type = op.get("type", "effect")
+            editable = (action_type not in _STRUCTURAL_TYPES
+                        and op.get("effect_id") is not None)
 
             item = _HistItem(
                 uid=op.get('uid', ''), index=i,
@@ -204,9 +220,11 @@ class EffectHistoryPanel(QWidget):
                 color=color,
                 timestamp=op.get('timestamp', ''),
                 enabled=op.get('enabled', True),
-                icon=icon)
+                icon=icon,
+                editable=editable)
             item.delete_clicked.connect(self.op_deleted.emit)
             item.toggle_clicked.connect(self.op_toggled.emit)
+            item.edit_clicked.connect(self.op_edit_clicked.emit)
             lo.addWidget(item)
 
         if not self._ops:

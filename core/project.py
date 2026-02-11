@@ -13,7 +13,7 @@ def save_project(filepath, timeline, sr, source_path="",
                  undo_stack=None, redo_stack=None):
     with zipfile.ZipFile(filepath, 'w', zipfile.ZIP_DEFLATED) as zf:
         meta = {
-            "version": "5.6",
+            "version": "7.1.BETA",
             "sample_rate": sr,
             "source_path": source_path,
             "clips": [],
@@ -32,6 +32,7 @@ def save_project(filepath, timeline, sr, source_path="",
             meta["clips"].append({
                 "name": clip.name, "file": wav_name,
                 "position": clip.position, "color": clip.color,
+                "id": clip.id,
             })
 
         if base_audio is not None:
@@ -85,6 +86,8 @@ def load_project(filepath):
                 audio_data=data, sample_rate=clip_sr,
                 position=cm.get("position", 0),
                 color=cm.get("color", colors[i % len(colors)]))
+            if "id" in cm:
+                clip.id = cm["id"]  # Preserve clip ID (v7)
             tl.clips.append(clip)
 
         if meta.get("has_base_audio") and "base_audio.wav" in zf.namelist():
@@ -118,9 +121,16 @@ def _ser_ops(ops):
     for op in ops:
         d = {k: v for k, v in op.items() if k not in ("_process_fn", "_state_after")}
         # Convert numpy types
-        for key in ["start", "end"]:
+        for key in ["start", "end", "init_start", "init_end"]:
             if key in d and hasattr(d[key], 'item'):
                 d[key] = int(d[key])
+        # Also convert numpy types in _replay sub-dict
+        if "_replay" in d and isinstance(d["_replay"], dict):
+            rd = d["_replay"] = dict(d["_replay"])
+            for key in ["sel_start", "sel_end", "init_start", "init_end",
+                         "clip_index", "local_pos", "src_idx", "tgt_idx"]:
+                if key in rd and hasattr(rd[key], 'item'):
+                    rd[key] = int(rd[key])
         out.append(d)
     return out
 

@@ -1,6 +1,6 @@
 """
 Filtre Resonant — Low-pass / High-pass avec cutoff et resonance.
-Peut aussi faire un sweep (balayage) automatique.
+Peut aussi faire un sweep (balayage) du cutoff.
 """
 
 import numpy as np

@@ -238,5 +238,8 @@
   "record.listen": "Listen",
   "record.listening": "Playing back...",
   "record.stop_listen": "Stop",
-  "record.idle": "Waiting..."
+  "record.idle": "Waiting...",
+  "history.edit_tip": "Edit this effect's parameters",
+  "history.edit_no_plugin": "Plugin not found — cannot edit this effect.",
+  "status.effect_edited": "Effect edited: {name}"
 }

@@ -137,7 +137,6 @@ th { background: #1a1a30; color: #a78bfa; }
 <p>The right panel shows the full history of all your actions, identified by icon and colour:</p>
 
 <p>• 🎛 <b>Effects</b> (purple) — Audio effects. Can be toggled on/off (● / ○).<br>
-• 📈 <b>Automations</b> (dark purple) — Parameter automations. Can be toggled on/off.<br>
 • ✂ <b>Cuts &amp; Splits</b> (orange) — Silence cuts, splice cuts, clip splits.<br>
 • 🔊🔉 <b>Fades</b> (green) — Fade In / Fade Out applied to clips.<br>
 • ➕ <b>Additions</b> (blue) — Clips added to the timeline.<br>
@@ -147,35 +146,18 @@ th { background: #1a1a30; color: #a78bfa; }
 • ↕ <b>Reorders</b> (grey) — Clip order changes.</p>
 
 <h3>Toggle On / Off</h3>
-<p>Click ● to temporarily disable any action (effects, automations, cuts, fades, additions…). Audio is fully recalculated from the initial state by replaying all enabled actions in order.</p>
+<p>Click ● to temporarily disable any action (effects, cuts, fades, additions…). Audio is fully recalculated from the initial state by replaying all enabled actions in order.</p>
+
+<div class="tip">💡 <b>Coordinate Mapping</b> — Cut and effect positions are stored in the original audio's coordinate space. When you toggle operations that change the audio length (splice cuts, deletions…), all positions are automatically recalculated. Cuts and effects always apply to exactly the same audio region, regardless of which operations are enabled.</div>
 
 <h3>Delete</h3>
 <p>Click ✕ to delete any action. Confirmation required. Audio is recalculated without that action — all other actions remain intact.</p>
 
+<h3>Edit an Effect</h3>
+<p>Click ✎ on an effect in the history to reopen its dialog with the current parameters. Adjust settings, preview, then confirm: audio is fully recalculated with the new parameters. Structural operations (cuts, fades…) cannot be edited this way.</p>
+
 <h3>Undo / Redo</h3>
 <p><kbd>Ctrl+Z</kbd> to undo, <kbd>Ctrl+Y</kbd> to redo. Works for all action types.</p>
-
-<!-- ═══════════════════════════════════ -->
-<h2>Automations</h2>
-
-<p>Vary effect parameters over time. Instead of fixed values, draw curves that control how parameters evolve across a selected region.</p>
-
-<p><b>Open</b> — <b>Automations</b> button in the transport bar, or <b>View &gt; Automations</b>.</p>
-
-<h3>Creating an automation</h3>
-<p>1. Drag on the mini waveform to select a region.<br>
-2. Click <b>Add Automation</b>, name it, choose an effect.<br>
-3. Check the parameters to include. Each can be <b>Automated</b> (From → To with curve) or <b>Constant</b> (fixed value).<br>
-4. Draw the curves: left-click to add a point, drag to reshape, right-click to delete.<br>
-5. The preview waveform at the bottom shows the result in real time (grey = original, purple = processed).<br>
-6. <kbd>Space</kbd> to preview with a playback bar. <b>Save</b> to apply.</p>
-
-<div class="tip">💡 Automations are applied on top of effects already in your chain.</div>
-
-<h3>Managing</h3>
-<p><b>ON/OFF</b> — Disable/re-enable. <b>Edit</b> — Reopen the curve editor. <b>Del</b> — Remove. <b>Redefine region</b> — Change the target region without closing the editor.</p>
-
-<div class="audio-desc">🔊 Examples: automate Filter Cutoff from 200 Hz to 8000 Hz with Resonance constant at 3.0 — cinematic resonant sweep. Automate Bitcrusher with Bit Depth constant at 8 and Downsample from 1 to 32 — progressive digital disintegration. Volume 100% → 0% — custom fade-out with full curve control.</div>
 
 <!-- ═══════════════════════════════════ -->
 <h2>Effects — Full Reference</h2>
@@ -197,7 +179,7 @@ th { background: #1a1a30; color: #a78bfa; }
 <div class="audio-desc">🔊 Low-pass = muffled sound. High-pass = thin and tinny. Band-pass = telephone effect. High resonance = sharp whistle at the cutoff.</div>
 
 <p><b>Pan / Stereo</b> — Position in the stereo field.</p>
-<div class="audio-desc">🔊 Hard pan left/right. Automating pan creates a sense of movement from ear to ear.</div>
+<div class="audio-desc">🔊 Hard pan left/right. Applied to a segment, creates a sense of spatial offset between ears.</div>
 
 <!-- ── Pitch & Time ── -->
 <h3>🎵 Pitch &amp; Time</h3>

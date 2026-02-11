@@ -238,5 +238,8 @@
   "record.listen": "Réécouter",
   "record.listening": "Lecture en cours...",
   "record.stop_listen": "Arrêter",
-  "record.idle": "En attente..."
+  "record.idle": "En attente...",
+  "history.edit_tip": "Modifier les paramètres de cet effet",
+  "history.edit_no_plugin": "Plugin introuvable — impossible de modifier cet effet.",
+  "status.effect_edited": "Effet modifié : {name}"
 }
