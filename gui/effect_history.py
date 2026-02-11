@@ -1,7 +1,7 @@
 """History panel — Right sidebar.
 Displays all actions (effects, cuts, fades, recordings, clip adds, automations, etc.)
-with toggle, individual delete, and visual "overridden" state for ops
-that precede the last structural action.
+with toggle and individual delete. All action types are treated equally:
+every op can be toggled on/off or deleted independently.
 """
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QScrollArea, QFrame
@@ -29,7 +29,7 @@ _ACTION_META = {
     "reorder":      ("↕", "#636e72"),
 }
 
-# Types that are structural (modify timeline, not toggleable)
+# Structural types (for scope label display only)
 _STRUCTURAL_TYPES = frozenset({
     "cut_silence", "cut_splice", "fade_in", "fade_out",
     "add_clip", "record", "delete_clip", "split", "duplicate", "reorder",
@@ -64,11 +64,9 @@ class _HistItem(QWidget):
     toggle_clicked = pyqtSignal(str)
 
     def __init__(self, uid, index, name, scope, color="#6c5ce7",
-                 timestamp="", enabled=True, icon="🎛",
-                 toggleable=True, overridden=False, parent=None):
+                 timestamp="", enabled=True, icon="🎛", parent=None):
         super().__init__(parent)
         self._uid = uid; self._color = color; self._hovered = False
-        self._overridden = overridden
         self.setFixedHeight(44); self.setMinimumWidth(180)
         C = get_colors()
         lo = QHBoxLayout(self); lo.setContentsMargins(8, 4, 8, 4); lo.setSpacing(6)
@@ -77,27 +75,23 @@ class _HistItem(QWidget):
         icon_lbl = QLabel(icon)
         icon_lbl.setFixedSize(20, 20)
         icon_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        opacity = "0.35" if overridden else "1.0"
-        icon_lbl.setStyleSheet(f"font-size: 13px; background: transparent; opacity: {opacity};")
+        icon_lbl.setStyleSheet("font-size: 13px; background: transparent;")
         lo.addWidget(icon_lbl)
 
-        # Toggle button (only for toggleable, non-overridden effects)
-        if toggleable and not overridden:
-            btn_t = QPushButton("●" if enabled else "○")
-            btn_t.setFixedSize(20, 20)
-            btn_t.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
-            tc = color if enabled else C['text_dim']
-            btn_t.setStyleSheet(
-                f"QPushButton {{ background: transparent; color: {tc}; border: none; font-size: 14px; }}"
-                f"QPushButton:hover {{ color: {COLORS['accent']}; }}")
-            btn_t.clicked.connect(lambda: self.toggle_clicked.emit(self._uid))
-            lo.addWidget(btn_t)
+        # Toggle button (all ops are toggleable)
+        btn_t = QPushButton("●" if enabled else "○")
+        btn_t.setFixedSize(20, 20)
+        btn_t.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        tc = color if enabled else C['text_dim']
+        btn_t.setStyleSheet(
+            f"QPushButton {{ background: transparent; color: {tc}; border: none; font-size: 14px; }}"
+            f"QPushButton:hover {{ color: {COLORS['accent']}; }}")
+        btn_t.clicked.connect(lambda: self.toggle_clicked.emit(self._uid))
+        lo.addWidget(btn_t)
 
         # Name + meta
         col = QVBoxLayout(); col.setSpacing(0); col.setContentsMargins(0, 0, 0, 0)
-        if overridden:
-            ns = f"color: {C['text_dim']}; font-style: italic;"
-        elif not enabled:
+        if not enabled:
             ns = f"color: {C['text_dim']}; text-decoration: line-through;"
         else:
             ns = f"color: {C['text']};"
@@ -105,8 +99,6 @@ class _HistItem(QWidget):
         lbl.setStyleSheet(f"{ns} font-size: 11px; font-weight: bold;")
         col.addWidget(lbl)
         parts = [s for s in [scope, timestamp] if s]
-        if overridden:
-            parts.append(t("history.overridden"))
         if parts:
             meta = QLabel(" · ".join(parts))
             meta.setStyleSheet(f"color: {C['text_dim']}; font-size: 9px;")
@@ -127,7 +119,7 @@ class _HistItem(QWidget):
     def paintEvent(self, e):
         if self._hovered:
             p = QPainter(self); c = QColor(self._color)
-            c.setAlpha(10 if self._overridden else 20)
+            c.setAlpha(20)
             p.setRenderHint(QPainter.RenderHint.Antialiasing)
             p.setBrush(QBrush(c))
             p.setPen(Qt.PenStyle.NoPen)
@@ -140,7 +132,6 @@ class EffectHistoryPanel(QWidget):
     """Right sidebar — displays all actions with toggle/delete."""
     op_deleted = pyqtSignal(str)
     op_toggled = pyqtSignal(str)
-    clear_all = pyqtSignal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -169,18 +160,6 @@ class EffectHistoryPanel(QWidget):
         self._count = QLabel("0")
         self._count.setStyleSheet(f"color: {C['text_dim']}; font-size: 10px; background: transparent;")
         hl.addWidget(self._count)
-
-        # Clear all button
-        self._btn_clear = QPushButton("⟲")
-        self._btn_clear.setFixedSize(22, 22)
-        self._btn_clear.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
-        self._btn_clear.setToolTip(t("history.clear_all"))
-        self._btn_clear.setStyleSheet(
-            f"QPushButton {{ background: transparent; color: {C['text_dim']}; border: none; font-size: 13px; }}"
-            f"QPushButton:hover {{ color: #e94560; }}")
-        self._btn_clear.clicked.connect(self.clear_all.emit)
-        self._btn_clear.setVisible(False)
-        hl.addWidget(self._btn_clear)
         lo.addWidget(hdr)
 
         # Scroll area
@@ -194,12 +173,10 @@ class EffectHistoryPanel(QWidget):
             f"QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height: 0; }}")
         lo.addWidget(self._scroll)
         self._ops = []
-        self._last_struct_idx = -1
         self._rebuild()
 
-    def set_ops(self, ops, last_struct_idx=-1):
+    def set_ops(self, ops):
         self._ops = list(ops)
-        self._last_struct_idx = last_struct_idx
         self._rebuild()
 
     def _rebuild(self):
@@ -207,8 +184,6 @@ class EffectHistoryPanel(QWidget):
         w = QWidget()
         w.setStyleSheet(f"background: {C['bg_panel']};")
         lo = QVBoxLayout(w); lo.setContentsMargins(4, 4, 4, 4); lo.setSpacing(0)
-
-        last_si = self._last_struct_idx
 
         for i, op in enumerate(self._ops):
             if i > 0:
@@ -218,17 +193,9 @@ class EffectHistoryPanel(QWidget):
                 sep.setStyleSheet(f"background: {C['border']}; margin: 0 4px;")
                 lo.addWidget(sep)
 
-            action_type = op.get("type", "effect")
             icon = _get_action_icon(op)
             color = _get_action_color(op)
             scope = _get_scope_label(op)
-
-            is_structural = action_type in _STRUCTURAL_TYPES
-            toggleable = action_type in ("effect", "automation")
-
-            # An effect/automation is "overridden" if it comes BEFORE the last
-            # structural op (since structural ops reset the audio state).
-            overridden = (not is_structural and i < last_si)
 
             item = _HistItem(
                 uid=op.get('uid', ''), index=i,
@@ -237,9 +204,7 @@ class EffectHistoryPanel(QWidget):
                 color=color,
                 timestamp=op.get('timestamp', ''),
                 enabled=op.get('enabled', True),
-                icon=icon,
-                toggleable=toggleable,
-                overridden=overridden)
+                icon=icon)
             item.delete_clicked.connect(self.op_deleted.emit)
             item.toggle_clicked.connect(self.op_toggled.emit)
             lo.addWidget(item)
@@ -252,4 +217,3 @@ class EffectHistoryPanel(QWidget):
         lo.addStretch()
         self._scroll.setWidget(w)
         self._count.setText(str(len(self._ops)))
-        self._btn_clear.setVisible(len(self._ops) > 0)

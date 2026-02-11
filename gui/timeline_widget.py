@@ -18,7 +18,7 @@ class TimelineWidget(QWidget):
     delete_requested = pyqtSignal(str)
     fade_in_requested = pyqtSignal(str)
     fade_out_requested = pyqtSignal(str)
-    clips_reordered = pyqtSignal()
+    clips_reordered = pyqtSignal(int, int)  # (src_idx, tgt_idx)
     seek_requested = pyqtSignal(int)  # sample position
     zoom_changed = pyqtSignal(float, float)  # (zoom, offset) — forward to waveform
 
@@ -212,6 +212,8 @@ class TimelineWidget(QWidget):
                     if self._drag_src in clips and target in clips:
                         src_idx = clips.index(self._drag_src)
                         tgt_idx = clips.index(target)
+                        orig_src = src_idx
+                        orig_tgt = tgt_idx
                         clip = clips.pop(src_idx)
                         if src_idx < tgt_idx:
                             tgt_idx -= 1
@@ -220,7 +222,7 @@ class TimelineWidget(QWidget):
                         for c in clips:
                             c.position = pos
                             pos += c.duration_samples
-                        self.clips_reordered.emit()
+                        self.clips_reordered.emit(orig_src, orig_tgt)
             except (ValueError, IndexError, RuntimeError) as ex:
                 _log.error("Drag error: %s", ex)
 

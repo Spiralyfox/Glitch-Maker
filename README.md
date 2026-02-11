@@ -6,7 +6,7 @@
 
 ### Ce que fait Glitch Maker
 
-Glitch Maker permet de transformer radicalement un fichier audio en lui appliquant des chaînes d'effets non-destructifs. Chaque action est enregistrée dans un historique complet : effets, coupes, fondus, ajouts de clips, enregistrements, duplications et réorganisations. Vous pouvez activer, désactiver ou supprimer chaque action à tout moment. Le logiciel découpe visuellement votre audio en clips sur une timeline, et vous sélectionnez précisément la zone à traiter grâce à la sélection rouge sur la waveform.
+Glitch Maker permet de transformer radicalement un fichier audio en lui appliquant des chaînes d'effets non-destructifs. Chaque action est enregistrée dans un historique complet : effets, coupes, fondus, ajouts de clips, enregistrements, duplications et réorganisations. Vous pouvez activer, désactiver ou supprimer chaque action indépendamment à tout moment — l'audio est recalculé depuis l'état initial. Le logiciel découpe visuellement votre audio en clips sur une timeline, et vous sélectionnez précisément la zone à traiter grâce à la sélection rouge sur la waveform.
 
 ### Fonctionnalités principales
 
@@ -20,7 +20,7 @@ Glitch Maker permet de transformer radicalement un fichier audio en lui appliqua
 - **Space & Texture** — Delay, Vinyl, OTT, Robotic Voice, Hyper : espace, texture et ambiances.
 - **Glitch** — Stutter, Granular, Shuffle, Buffer Freeze, Datamosh, Vocal Chop, Tape Glitch : effets destructifs et expérimentaux.
 
-**Historique complet** — Toutes les actions sont tracées dans le panneau Historique avec icônes et couleurs par type (effets, automations, coupes, fondus, ajouts, enregistrements, suppressions, duplications, réorganisations). Les effets et automations sont activables/désactivables individuellement. Les actions structurelles (coupes, fondus, ajouts…) capturent un instantané complet de l'état audio — les effets antérieurs apparaissent grisés comme « remplacés » car ils ne contribuent plus au rendu. La suppression d'une action structurelle demande confirmation car toutes les actions suivantes seront aussi supprimées. Bouton « Tout effacer » pour repartir de zéro. Annuler/refaire avec Ctrl+Z / Ctrl+Y.
+**Historique complet** — Toutes les actions sont tracées dans le panneau Historique avec icônes et couleurs par type (effets, automations, coupes, fondus, ajouts, enregistrements, suppressions, duplications, réorganisations). Toutes les actions sont activables/désactivables et supprimables individuellement — l'audio est entièrement recalculé depuis l'état initial en rejouant les actions activées dans l'ordre. Annuler/refaire avec Ctrl+Z / Ctrl+Y.
 
 **Automations** — Automatisez un ou plusieurs paramètres d'effet au fil du temps, comme dans FL Studio. Sélectionnez une zone, choisissez un effet, cochez les paramètres à automatiser (avec courbe éditable From → To) ou à fixer en valeur constante. Aperçu waveform en temps réel (grise = original, violette = traité). Prévisualisation audio avec barre de lecture. Les automations s'empilent sur l'audio avec tous les effets déjà appliqués.
 
@@ -77,7 +77,7 @@ FFmpeg est téléchargé automatiquement au premier lancement si nécessaire.
 
 ### What Glitch Maker does
 
-Glitch Maker lets you radically transform an audio file by applying non-destructive effect chains. Every action is recorded in a full history: effects, cuts, fades, clip additions, recordings, duplications and reorders. You can enable, disable or delete any action at any time. The software visually slices your audio into clips on a timeline, and you precisely select the area to process using the red selection on the waveform.
+Glitch Maker lets you radically transform an audio file by applying non-destructive effect chains. Every action is recorded in a full history: effects, cuts, fades, clip additions, recordings, duplications and reorders. You can enable, disable or delete any action independently at any time — audio is recalculated from the initial state. The software visually slices your audio into clips on a timeline, and you precisely select the area to process using the red selection on the waveform.
 
 ### Key features
 
@@ -91,7 +91,7 @@ Glitch Maker lets you radically transform an audio file by applying non-destruct
 - **Space & Texture** — Delay, Vinyl, OTT, Robotic Voice, Hyper: space, texture and atmospheres.
 - **Glitch** — Stutter, Granular, Shuffle, Buffer Freeze, Datamosh, Vocal Chop, Tape Glitch: destructive and experimental effects.
 
-**Full history** — All actions are tracked in the History panel with icons and colours by type (effects, automations, cuts, fades, additions, recordings, deletions, duplications, reorders). Effects and automations can be toggled on/off individually. Structural actions (cuts, fades, additions…) capture a full audio state snapshot — earlier effects appear greyed out as "overridden" since they no longer contribute to the output. Deleting a structural action requires confirmation as all subsequent actions will also be removed. "Clear All" button to start fresh. Undo/redo with Ctrl+Z / Ctrl+Y.
+**Full history** — All actions are tracked in the History panel with icons and colours by type (effects, automations, cuts, fades, additions, recordings, deletions, duplications, reorders). All actions can be toggled on/off and deleted individually — audio is fully recalculated from the initial state by replaying enabled actions in order. Undo/redo with Ctrl+Z / Ctrl+Y.
 
 **Automations** — Automate one or more effect parameters over time, like in FL Studio. Select a region, choose an effect, check parameters to automate (with editable From → To curve) or set as constant. Real-time waveform preview (grey = original, purple = processed). Audio preview with playback bar. Automations stack on top of all previously applied effects.
 

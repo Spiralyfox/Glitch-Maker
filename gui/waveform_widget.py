@@ -59,6 +59,7 @@ class WaveformWidget(QWidget):
         self._marker_colors = ["#ff6b6b", "#ffd93d", "#6bcb77", "#4d96ff",
                                 "#ff85a1", "#48bfe3", "#e07c24", "#b5179e"]
         self._marker_idx = 0
+        self._right_click_sample = None
 
         # Precompute colors
         self._wave_rgb = _parse_color(COLORS['accent'])
@@ -240,6 +241,10 @@ class WaveformWidget(QWidget):
             self._clip_hl_end = None
             self.drag_started.emit()
             self.update()
+        elif e.button() == Qt.MouseButton.RightButton:
+            # Store right-click position for contextMenuEvent
+            self._right_click_sample = self._pos_to_sample(e.position().x()) if self.audio_data is not None else None
+            e.accept()
 
     def mouseMoveEvent(self, e):
         """Mise a jour de la selection pendant le drag."""
@@ -265,10 +270,14 @@ class WaveformWidget(QWidget):
             self.update()
 
     def contextMenuEvent(self, e):
-        """Right-click: add marker, or cut if inside a selection."""
+        """Right-click: cut (if inside selection), marker add/delete/clear — always available."""
         if self.audio_data is None:
             return
-        pos = self._pos_to_sample(e.pos().x())
+        e.accept()
+        # Use stored right-click sample position (more reliable than contextMenu event pos)
+        pos = getattr(self, '_right_click_sample', None)
+        if pos is None:
+            pos = self._pos_to_sample(e.pos().x())
         from PyQt6.QtWidgets import QMenu
         menu = QMenu(self)
         menu.setStyleSheet(
@@ -290,7 +299,7 @@ class WaveformWidget(QWidget):
                 a_cut_splice = menu.addAction("✂ " + t("cut.splice"))
                 menu.addSeparator()
 
-        # ── Marker options ──
+        # ── Marker options (always available) ──
         a_add = menu.addAction("📌 " + t("marker.add_title"))
         a_del = None
         near = None
@@ -300,8 +309,11 @@ class WaveformWidget(QWidget):
                 near = m; break
         if near:
             a_del = menu.addAction(f"✕ Remove '{near['name']}'")
-        menu.addSeparator()
-        a_clear = menu.addAction(t("marker.clear_all"))
+        if self._markers:
+            menu.addSeparator()
+            a_clear = menu.addAction(t("marker.clear_all"))
+        else:
+            a_clear = None
 
         action = menu.exec(e.globalPos())
         if action is None:

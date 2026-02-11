@@ -456,7 +456,6 @@ class MainWindow(QMainWindow):
         # v4.4: non-destructive ops signals
         self.effect_history.op_deleted.connect(self._delete_op)
         self.effect_history.op_toggled.connect(self._toggle_op)
-        self.effect_history.clear_all.connect(self._clear_all_ops)
 
         # Automation window signals
         self._auto_win.automation_added.connect(self._add_automation)
@@ -967,7 +966,8 @@ class MainWindow(QMainWindow):
             self.timeline.add_clip(st, sr, name=name, color=color)
             self._rebuild_audio()
             self._base_audio = self.audio_data.copy()
-            self._add_structural_op("add_clip", f"➕ {name}")
+            self._add_structural_op("add_clip", f"➕ {name}",
+                                    replay_data={"audio": st.copy(), "name": name, "color": color})
             self._refresh_all()
             self._unsaved = True
             self.statusBar().showMessage(f"Added: {os.path.basename(fp)}")
@@ -1203,27 +1203,11 @@ class MainWindow(QMainWindow):
             _log.error("Apply op error: %s", ex, exc_info=True)
 
     def _render_from_ops(self):
-        """Re-render audio by restoring latest structural state then applying effects."""
-        # Find the last enabled structural op
-        last_struct_idx = -1
-        for i, op in enumerate(self._effect_ops):
-            if op.get("enabled", True) and op.get("type", "effect") in self._STRUCTURAL_TYPES:
-                last_struct_idx = i
-
-        # Restore base state
-        if last_struct_idx >= 0:
-            state = self._effect_ops[last_struct_idx].get("_state_after")
-            if state:
-                self._restore_state_snapshot(state)
-                # base_audio from snapshot is already the rendered timeline
-                self.audio_data = self._base_audio.copy() if self._base_audio is not None else None
-            else:
-                # Fallback: use current base_audio (project loaded without snapshots)
-                if self._base_audio is None:
-                    return
-                self.audio_data = self._base_audio.copy()
-        elif self._initial_base_audio is not None:
-            # No structural ops: restore initial state
+        """Re-render audio by replaying ALL enabled ops from the initial state.
+        Structural ops are replayed via _replay_structural_op(),
+        effects and automations are applied on the resulting audio."""
+        # Step 1: Restore the initial state (before any ops)
+        if self._initial_base_audio is not None:
             self._restore_initial_state()
             self.audio_data = self._base_audio.copy() if self._base_audio is not None else None
         else:
@@ -1235,18 +1219,28 @@ class MainWindow(QMainWindow):
         if self.audio_data is None:
             return
 
-        # Apply all enabled effect/automation ops AFTER the last structural op
-        for i, op in enumerate(self._effect_ops):
-            if i <= last_struct_idx:
-                continue  # already baked into structural snapshot
+        # Step 2: Replay all enabled ops in order
+        for op in self._effect_ops:
             if not op.get("enabled", True):
                 continue
-            if op.get("type", "effect") in self._STRUCTURAL_TYPES:
-                continue  # disabled structural ops are skipped
-            # Automation ops
-            if op.get("type") == "automation":
-                self._render_auto_op(op)
+
+            op_type = op.get("type", "effect")
+
+            # Structural ops → replay from _replay data
+            if op_type in self._STRUCTURAL_TYPES:
+                if not self._replay_structural_op(op):
+                    _log.warning("Replay skipped (failed): %s", op.get("name"))
+                # After replay, audio_data is already updated by _rebuild_audio
+                # inside _replay_structural_op, so just continue
                 continue
+
+            # Automation ops
+            if op_type == "automation":
+                self._render_auto_op(op)
+                # Sync modified audio back to clips so next structural op sees changes
+                self._update_clips_from_audio()
+                continue
+
             # Effect ops
             plugin = self._find_plugin(op.get("effect_id"))
             if not plugin:
@@ -1276,6 +1270,8 @@ class MainWindow(QMainWindow):
                     after = self.audio_data[e:]
                     parts = [p for p in [before, mod, after] if len(p) > 0]
                     self.audio_data = np.concatenate(parts, axis=0).astype(np.float32)
+                # Sync modified audio back to clips so next structural op sees changes
+                self._update_clips_from_audio()
             except Exception as ex:
                 _log.warning("Render op %s failed: %s", op.get("name"), ex)
         self._update_clips_from_audio()
@@ -1311,83 +1307,32 @@ class MainWindow(QMainWindow):
             _log.warning("Automation render %s failed: %s", op.get("name"), ex)
 
     def _delete_op(self, uid):
-        """Delete an op by uid and re-render.
-        - Deleting a structural op: confirmation + truncate from that point.
-        - Deleting an effect BEFORE the last structural op: just remove it (it was overridden).
-        - Deleting an effect AFTER the last structural op: remove and re-render.
-        """
+        """Delete any op by uid and re-render from initial state.
+        All op types (structural, effect, automation) are treated equally."""
         idx = next((i for i, o in enumerate(self._effect_ops) if o.get("uid") == uid), None)
         if idx is None:
             return
         op = self._effect_ops[idx]
         name = op.get("name", "?")
-        is_structural = op.get("type", "effect") in self._STRUCTURAL_TYPES
-
-        # Find the last structural op index
-        last_struct_idx = -1
-        for i, o in enumerate(self._effect_ops):
-            if o.get("type", "effect") in self._STRUCTURAL_TYPES:
-                last_struct_idx = i
-
-        if is_structural:
-            # Count how many ops will be lost
-            ops_after = len(self._effect_ops) - idx - 1
-            if ops_after > 0:
-                reply = QMessageBox.question(
-                    self, APP_NAME,
-                    t("history.delete_structural").format(
-                        name=name, count=ops_after),
-                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                    QMessageBox.StandardButton.No)
-                if reply != QMessageBox.StandardButton.Yes:
-                    return
-            self._push_undo(f"Delete : {name}")
-            self._effect_ops = self._effect_ops[:idx]
-        elif idx < last_struct_idx:
-            # Effect before the last structural op — it's overridden anyway.
-            # Just remove it from the list, no re-render needed.
-            self._push_undo(f"Delete : {name}")
-            self._effect_ops.pop(idx)
-            self._sync_history_chain()
-            self._unsaved = True
-            self.statusBar().showMessage(f"Removed : {name}")
+        reply = QMessageBox.question(
+            self, APP_NAME,
+            t("history.delete_confirm").format(name=name),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No)
+        if reply != QMessageBox.StandardButton.Yes:
             return
-        else:
-            # Effect after the last structural op — remove and re-render
-            self._push_undo(f"Delete : {name}")
-            self._effect_ops.pop(idx)
-
+        self._push_undo(f"Delete : {name}")
+        self._effect_ops.pop(idx)
         self._render_from_ops()
         self._sync_history_chain()
         self._unsaved = True
         self.statusBar().showMessage(f"Removed : {name}")
 
-    def _clear_all_ops(self):
-        """Clear all history ops after confirmation."""
-        if not self._effect_ops:
-            return
-        reply = QMessageBox.question(
-            self, APP_NAME,
-            t("history.clear_confirm").format(count=len(self._effect_ops)),
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No)
-        if reply != QMessageBox.StandardButton.Yes:
-            return
-        self._push_undo("Clear all history")
-        self._effect_ops.clear()
-        self._render_from_ops()
-        self._sync_history_chain()
-        self._unsaved = True
-        self.statusBar().showMessage(t("history.cleared"))
-
     def _toggle_op(self, uid):
-        """Toggle an op enabled/disabled and re-render.
-        Structural ops cannot be toggled (UI prevents it)."""
+        """Toggle any op enabled/disabled and re-render.
+        Works for all types including structural ops."""
         op = next((o for o in self._effect_ops if o.get("uid") == uid), None)
         if op is None: return
-        # Structural ops cannot be toggled
-        if op.get("type", "effect") in self._STRUCTURAL_TYPES:
-            return
         self._push_undo(f"Toggle : {op['name']}")
         op["enabled"] = not op.get("enabled", True)
         self._render_from_ops()
@@ -1397,20 +1342,12 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage(f"{op['name']} : {state}")
 
     def _move_op(self, uid, direction):
-        """Move an op up or down in the chain and re-render.
-        Cannot move across structural op boundaries or move structural ops."""
+        """Move any op up or down in the chain and re-render."""
         idx = next((i for i, o in enumerate(self._effect_ops) if o.get("uid") == uid), None)
         if idx is None: return
-        op = self._effect_ops[idx]
-        # Structural ops cannot be moved
-        if op.get("type", "effect") in self._STRUCTURAL_TYPES:
-            return
         new_idx = idx + direction
         if new_idx < 0 or new_idx >= len(self._effect_ops): return
-        # Cannot swap with a structural op
-        target = self._effect_ops[new_idx]
-        if target.get("type", "effect") in self._STRUCTURAL_TYPES:
-            return
+        op = self._effect_ops[idx]
         self._push_undo(f"Move : {op['name']}")
         self._effect_ops[idx], self._effect_ops[new_idx] = \
             self._effect_ops[new_idx], self._effect_ops[idx]
@@ -1420,12 +1357,7 @@ class MainWindow(QMainWindow):
 
     def _sync_history_chain(self):
         """Sync history panel and automation window with current ops."""
-        # Compute the last structural op index so the panel can dim overridden ops
-        last_struct_idx = -1
-        for i, op in enumerate(self._effect_ops):
-            if op.get("type", "effect") in self._STRUCTURAL_TYPES:
-                last_struct_idx = i
-        self.effect_history.set_ops(self._effect_ops, last_struct_idx)
+        self.effect_history.set_ops(self._effect_ops)
         if self._auto_win.isVisible():
             self._auto_win.set_automations(self._effect_ops)
             audio = self.audio_data if self.audio_data is not None else self._base_audio
@@ -1492,6 +1424,10 @@ class MainWindow(QMainWindow):
                 "data": c.audio_data.copy(),
                 "position": c.position,
                 "color": c.color,
+                "fade_in_params": dict(c.fade_in_params) if c.fade_in_params else {},
+                "fade_out_params": dict(c.fade_out_params) if c.fade_out_params else {},
+                "bfi": c._audio_before_fade_in.copy() if c._audio_before_fade_in is not None else None,
+                "bfo": c._audio_before_fade_out.copy() if c._audio_before_fade_out is not None else None,
             })
 
     def _restore_initial_state(self):
@@ -1504,10 +1440,14 @@ class MainWindow(QMainWindow):
             c = AudioClip(name=cd["name"], audio_data=cd["data"].copy(),
                           sample_rate=self.sample_rate,
                           position=cd["position"], color=cd["color"])
+            c.fade_in_params = cd.get("fade_in_params", {})
+            c.fade_out_params = cd.get("fade_out_params", {})
+            c._audio_before_fade_in = cd["bfi"].copy() if cd.get("bfi") is not None else None
+            c._audio_before_fade_out = cd["bfo"].copy() if cd.get("bfo") is not None else None
             self.timeline.clips.append(c)
 
-    def _add_structural_op(self, op_type, name):
-        """Add a structural action to the ops history with state snapshot."""
+    def _add_structural_op(self, op_type, name, replay_data=None):
+        """Add a structural action to the ops history with state snapshot and replay data."""
         import uuid as _uuid
         state = self._capture_state()
         op = {
@@ -1518,9 +1458,273 @@ class MainWindow(QMainWindow):
             "enabled": True,
             "is_global": True,
             "_state_after": state,
+            "_replay": replay_data or {},
         }
         self._effect_ops.append(op)
         self._sync_history_chain()
+
+    def _replay_structural_op(self, op):
+        """Replay a structural op on the current timeline state using stored _replay data.
+        Returns True on success, False if the op could not be replayed (e.g. index out of range).
+        After success, timeline.clips + _base_audio + audio_data are updated."""
+        rd = op.get("_replay", {})
+        op_type = op.get("type", "")
+        clips = self.timeline.clips
+
+        try:
+            if op_type == "cut_silence":
+                return self._replay_cut_silence(rd, clips)
+            elif op_type == "cut_splice":
+                return self._replay_cut_splice(rd, clips)
+            elif op_type == "split":
+                return self._replay_split(rd, clips)
+            elif op_type == "duplicate":
+                return self._replay_duplicate(rd, clips)
+            elif op_type == "delete_clip":
+                return self._replay_delete_clip(rd, clips)
+            elif op_type == "reorder":
+                return self._replay_reorder(rd, clips)
+            elif op_type == "fade_in":
+                return self._replay_fade_in(rd, clips)
+            elif op_type == "fade_out":
+                return self._replay_fade_out(rd, clips)
+            elif op_type in ("add_clip", "record"):
+                return self._replay_add_clip(rd, clips)
+            else:
+                _log.warning("Unknown structural op type for replay: %s", op_type)
+                return False
+        except Exception as ex:
+            _log.warning("Replay %s failed: %s", op_type, ex)
+            return False
+
+    # ── Individual replay methods ──
+
+    def _replay_cut_silence(self, rd, clips):
+        """Replay cut-replace-with-silence on current clips."""
+        sel_start, sel_end = rd.get("sel_start"), rd.get("sel_end")
+        if sel_start is None or sel_end is None:
+            return False
+        new_clips = []
+        for clip in list(clips):
+            cs, ce = clip.position, clip.end_position
+            if sel_end <= cs or sel_start >= ce:
+                new_clips.append(clip)
+                continue
+            ov_start = max(sel_start, cs) - cs
+            ov_end = min(sel_end, ce) - cs
+            pos = cs
+            parts = []
+            if ov_start > 0:
+                d1 = clip.audio_data[:ov_start].copy()
+                c1 = AudioClip(name=f"{clip.name}_A", audio_data=d1,
+                               sample_rate=self.sample_rate, position=pos)
+                c1.color = _generate_distinct_color(self.timeline._color_counter)
+                self.timeline._color_counter += 1
+                parts.append(c1)
+                pos += len(d1)
+            sil_len = ov_end - ov_start
+            if sil_len > 0:
+                shape = (sil_len, 2) if clip.audio_data.ndim > 1 else (sil_len,)
+                d2 = np.zeros(shape, dtype=np.float32)
+                c2 = AudioClip(name=f"{clip.name}_S", audio_data=d2,
+                               sample_rate=self.sample_rate, position=pos)
+                c2.color = _generate_distinct_color(self.timeline._color_counter)
+                self.timeline._color_counter += 1
+                parts.append(c2)
+                pos += sil_len
+            if ov_end < len(clip.audio_data):
+                d3 = clip.audio_data[ov_end:].copy()
+                c3 = AudioClip(name=f"{clip.name}_B", audio_data=d3,
+                               sample_rate=self.sample_rate, position=pos)
+                c3.color = _generate_distinct_color(self.timeline._color_counter)
+                self.timeline._color_counter += 1
+                parts.append(c3)
+            new_clips.extend(parts)
+        self.timeline.clips = new_clips
+        pos = 0
+        for c in self.timeline.clips:
+            c.position = pos
+            pos += c.duration_samples
+        self._rebuild_audio()
+        self._base_audio = self.audio_data.copy() if self.audio_data is not None else None
+        return True
+
+    def _replay_cut_splice(self, rd, clips):
+        """Replay cut-and-splice on current clips."""
+        sel_start, sel_end = rd.get("sel_start"), rd.get("sel_end")
+        if sel_start is None or sel_end is None:
+            return False
+        new_clips = []
+        for clip in list(clips):
+            cs, ce = clip.position, clip.end_position
+            if sel_end <= cs or sel_start >= ce:
+                new_clips.append(clip)
+                continue
+            ov_start = max(sel_start, cs) - cs
+            ov_end = min(sel_end, ce) - cs
+            parts = []
+            if ov_start > 0:
+                d1 = clip.audio_data[:ov_start].copy()
+                c1 = AudioClip(name=f"{clip.name}_A", audio_data=d1,
+                               sample_rate=self.sample_rate, position=0)
+                c1.color = _generate_distinct_color(self.timeline._color_counter)
+                self.timeline._color_counter += 1
+                parts.append(c1)
+            if ov_end < len(clip.audio_data):
+                d2 = clip.audio_data[ov_end:].copy()
+                c2 = AudioClip(name=f"{clip.name}_B", audio_data=d2,
+                               sample_rate=self.sample_rate, position=0)
+                c2.color = _generate_distinct_color(self.timeline._color_counter)
+                self.timeline._color_counter += 1
+                parts.append(c2)
+            if parts:
+                new_clips.extend(parts)
+        if not new_clips:
+            c = AudioClip(name="Empty", audio_data=np.zeros((1, 2), dtype=np.float32),
+                          sample_rate=self.sample_rate, position=0)
+            c.color = _generate_distinct_color(self.timeline._color_counter)
+            self.timeline._color_counter += 1
+            new_clips.append(c)
+        self.timeline.clips = new_clips
+        pos = 0
+        for c in self.timeline.clips:
+            c.position = pos
+            pos += c.duration_samples
+        self._rebuild_audio()
+        self._base_audio = self.audio_data.copy() if self.audio_data is not None else None
+        return True
+
+    def _replay_split(self, rd, clips):
+        """Replay split on current clips."""
+        idx = rd.get("clip_index")
+        local_pos = rd.get("local_pos")
+        if idx is None or local_pos is None:
+            return False
+        if idx < 0 or idx >= len(clips):
+            return False
+        clip = clips[idx]
+        if local_pos <= 0 or local_pos >= clip.duration_samples:
+            return False
+        d1 = clip.audio_data[:local_pos]
+        d2 = clip.audio_data[local_pos:]
+        c1 = AudioClip(name=f"{clip.name}_L", audio_data=d1,
+                        sample_rate=self.sample_rate, position=clip.position,
+                        color=_generate_distinct_color(self.timeline._color_counter))
+        self.timeline._color_counter += 1
+        c2 = AudioClip(name=f"{clip.name}_R", audio_data=d2,
+                        sample_rate=self.sample_rate, position=clip.position + local_pos,
+                        color=_generate_distinct_color(self.timeline._color_counter))
+        self.timeline._color_counter += 1
+        clips[idx:idx+1] = [c1, c2]
+        self._rebuild_audio()
+        self._base_audio = self.audio_data.copy() if self.audio_data is not None else None
+        return True
+
+    def _replay_duplicate(self, rd, clips):
+        """Replay duplicate on current clips."""
+        idx = rd.get("clip_index")
+        if idx is None or idx < 0 or idx >= len(clips):
+            return False
+        clip = clips[idx]
+        color = _generate_distinct_color(self.timeline._color_counter)
+        self.timeline._color_counter += 1
+        dup = AudioClip(name=f"{clip.name} (dup)", audio_data=clip.audio_data.copy(),
+                        sample_rate=self.sample_rate,
+                        position=clip.end_position, color=color)
+        clips.insert(idx + 1, dup)
+        self._rebuild_audio()
+        self._base_audio = self.audio_data.copy() if self.audio_data is not None else None
+        return True
+
+    def _replay_delete_clip(self, rd, clips):
+        """Replay delete clip on current clips."""
+        idx = rd.get("clip_index")
+        if idx is None or idx < 0 or idx >= len(clips):
+            return False
+        if len(clips) <= 1:
+            return False
+        clips.pop(idx)
+        pos = 0
+        for c in clips:
+            c.position = pos
+            pos += c.duration_samples
+        self._rebuild_audio()
+        self._base_audio = self.audio_data.copy() if self.audio_data is not None else None
+        return True
+
+    def _replay_reorder(self, rd, clips):
+        """Replay reorder on current clips."""
+        src = rd.get("src_idx")
+        tgt = rd.get("tgt_idx")
+        if src is None or tgt is None:
+            return False
+        if src < 0 or src >= len(clips) or tgt < 0 or tgt >= len(clips):
+            return False
+        clip = clips.pop(src)
+        insert_at = tgt
+        if src < tgt:
+            insert_at -= 1
+        clips.insert(insert_at, clip)
+        pos = 0
+        for c in clips:
+            c.position = pos
+            pos += c.duration_samples
+        self._rebuild_audio()
+        self._base_audio = self.audio_data.copy() if self.audio_data is not None else None
+        return True
+
+    def _replay_fade_in(self, rd, clips):
+        """Replay fade-in on current clips."""
+        idx = rd.get("clip_index")
+        params = rd.get("params")
+        if idx is None or params is None or idx < 0 or idx >= len(clips):
+            return False
+        clip = clips[idx]
+        # Store original for future re-edits
+        if clip._audio_before_fade_in is None:
+            clip._audio_before_fade_in = clip.audio_data.copy()
+        fade_samples = int(params["duration_ms"] / 1000.0 * self.sample_rate)
+        clip.audio_data = apply_envelope_fade(
+            clip.audio_data, fade_samples,
+            params["points"], params["bends"], "in")
+        clip.fade_in_params = params
+        self._rebuild_audio()
+        self._base_audio = self.audio_data.copy() if self.audio_data is not None else None
+        return True
+
+    def _replay_fade_out(self, rd, clips):
+        """Replay fade-out on current clips."""
+        idx = rd.get("clip_index")
+        params = rd.get("params")
+        if idx is None or params is None or idx < 0 or idx >= len(clips):
+            return False
+        clip = clips[idx]
+        # Store original for future re-edits
+        if clip._audio_before_fade_out is None:
+            clip._audio_before_fade_out = clip.audio_data.copy()
+        fade_samples = int(params["duration_ms"] / 1000.0 * self.sample_rate)
+        clip.audio_data = apply_envelope_fade(
+            clip.audio_data, fade_samples,
+            params["points"], params["bends"], "out")
+        clip.fade_out_params = params
+        self._rebuild_audio()
+        self._base_audio = self.audio_data.copy() if self.audio_data is not None else None
+        return True
+
+    def _replay_add_clip(self, rd, clips):
+        """Replay add-clip or record on current clips."""
+        audio = rd.get("audio")
+        name = rd.get("name", "Clip")
+        color = rd.get("color")
+        if audio is None:
+            return False
+        if color is None:
+            color = _generate_distinct_color(self.timeline._color_counter)
+            self.timeline._color_counter += 1
+        self.timeline.add_clip(audio.copy(), self.sample_rate, name=name, color=color)
+        self._rebuild_audio()
+        self._base_audio = self.audio_data.copy() if self.audio_data is not None else None
+        return True
 
     def _add_automation(self, op):
         """Add a new automation as an effect op."""
@@ -1808,11 +2012,12 @@ class MainWindow(QMainWindow):
 
     # ══════ Timeline ops ══════
 
-    def _on_reorder(self):
+    def _on_reorder(self, src_idx, tgt_idx):
         self._push_undo("Reorder")
         self._rebuild_audio()
         self._base_audio = self.audio_data.copy() if self.audio_data is not None else None
-        self._add_structural_op("reorder", "↕ Reorder")
+        self._add_structural_op("reorder", "↕ Reorder",
+                                replay_data={"src_idx": src_idx, "tgt_idx": tgt_idx})
         self._unsaved = True
 
     def _split_clip(self, cid, pos):
@@ -1835,7 +2040,8 @@ class MainWindow(QMainWindow):
         self.timeline.clips[idx:idx+1] = [c1, c2]
         self._rebuild_audio()
         self._base_audio = self.audio_data.copy() if self.audio_data is not None else None
-        self._add_structural_op("split", f"✂ Split ({clip.name})")
+        self._add_structural_op("split", f"✂ Split ({clip.name})",
+                                replay_data={"clip_index": idx, "local_pos": local})
         self._unsaved = True
 
     def _dup_clip(self, cid):
@@ -1851,7 +2057,8 @@ class MainWindow(QMainWindow):
         self.timeline.clips.insert(idx + 1, dup)
         self._rebuild_audio()
         self._base_audio = self.audio_data.copy() if self.audio_data is not None else None
-        self._add_structural_op("duplicate", f"📋 Duplicate ({clip.name})")
+        self._add_structural_op("duplicate", f"📋 Duplicate ({clip.name})",
+                                replay_data={"clip_index": idx})
         self._unsaved = True
 
     def _del_clip(self, cid):
@@ -1870,10 +2077,12 @@ class MainWindow(QMainWindow):
             if reply != QMessageBox.StandardButton.Yes:
                 return
             self._push_undo("Delete clip")
+            clip_idx = self.timeline.clips.index(clip)
             self.timeline.remove_clip(clip)
             self._rebuild_audio()
             self._base_audio = self.audio_data.copy() if self.audio_data is not None else None
-            self._add_structural_op("delete_clip", f"🗑 {clip_name}")
+            self._add_structural_op("delete_clip", f"🗑 {clip_name}",
+                                    replay_data={"clip_index": clip_idx})
             self._refresh_all()
             self._unsaved = True
         except Exception as e:
@@ -1939,7 +2148,8 @@ class MainWindow(QMainWindow):
             pos += c.duration_samples
         self._rebuild_audio()
         self._base_audio = self.audio_data.copy() if self.audio_data is not None else None
-        self._add_structural_op("cut_silence", "✂ Cut (silence)")
+        self._add_structural_op("cut_silence", "✂ Cut (silence)",
+                                replay_data={"sel_start": sel_start, "sel_end": sel_end})
         self.waveform.clear_selection()
         self._unsaved = True
 
@@ -2000,7 +2210,8 @@ class MainWindow(QMainWindow):
             pos += c.duration_samples
         self._rebuild_audio()
         self._base_audio = self.audio_data.copy() if self.audio_data is not None else None
-        self._add_structural_op("cut_splice", "✂ Cut (splice)")
+        self._add_structural_op("cut_splice", "✂ Cut (splice)",
+                                replay_data={"sel_start": sel_start, "sel_end": sel_end})
         self.waveform.clear_selection()
         self._unsaved = True
 
@@ -2042,9 +2253,11 @@ class MainWindow(QMainWindow):
             clip.audio_data, fade_samples,
             params["points"], params["bends"], "in")
         clip.fade_in_params = params
+        clip_idx = self.timeline.clips.index(clip)
         self._rebuild_audio()
         self._base_audio = self.audio_data.copy() if self.audio_data is not None else None
-        self._add_structural_op("fade_in", f"🔊 Fade In ({clip.name})")
+        self._add_structural_op("fade_in", f"🔊 Fade In ({clip.name})",
+                                replay_data={"clip_index": clip_idx, "params": params})
         if self._effect_ops and any(op.get("type", "effect") not in self._STRUCTURAL_TYPES for op in self._effect_ops):
             self._render_from_ops()
         self._unsaved = True
@@ -2087,9 +2300,11 @@ class MainWindow(QMainWindow):
             clip.audio_data, fade_samples,
             params["points"], params["bends"], "out")
         clip.fade_out_params = params
+        clip_idx = self.timeline.clips.index(clip)
         self._rebuild_audio()
         self._base_audio = self.audio_data.copy() if self.audio_data is not None else None
-        self._add_structural_op("fade_out", f"🔉 Fade Out ({clip.name})")
+        self._add_structural_op("fade_out", f"🔉 Fade Out ({clip.name})",
+                                replay_data={"clip_index": clip_idx, "params": params})
         if self._effect_ops and any(op.get("type", "effect") not in self._STRUCTURAL_TYPES for op in self._effect_ops):
             self._render_from_ops()
         self._unsaved = True
@@ -2313,7 +2528,8 @@ class MainWindow(QMainWindow):
             self.timeline.add_clip(st, sr, name=name, color=color)
             self._rebuild_audio()
             self._base_audio = self.audio_data.copy() if self.audio_data is not None else None
-            self._add_structural_op("record", f"🎙 {name}")
+            self._add_structural_op("record", f"🎙 {name}",
+                                    replay_data={"audio": st.copy(), "name": name, "color": color})
         self._refresh_all()
         self._unsaved = True
 
@@ -2325,11 +2541,8 @@ class MainWindow(QMainWindow):
 
     def _open_manual(self):
         import webbrowser
-        lang = get_language()
         base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        manual = os.path.join(base, "assets", f"manual_{lang}.html")
-        if not os.path.exists(manual):
-            manual = os.path.join(base, "assets", "manual_en.html")
+        manual = os.path.join(base, "assets", "manual.html")
         if os.path.exists(manual):
             webbrowser.open(f"file://{manual}")
         else:

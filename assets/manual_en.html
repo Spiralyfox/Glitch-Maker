@@ -35,7 +35,7 @@ th { background: #1a1a30; color: #a78bfa; }
 
 <p><b>Centre — Waveform &amp; Timeline</b>: the main workspace. At the top, the audio waveform with selection, markers and playhead. Below, the timeline shows clips as coloured blocks. Between them, the transport bar (Play/Pause/Stop, time display, volume). A real-time spectrum analyser sits at the bottom right.</p>
 
-<p><b>Right Panel — History</b>: every action you perform (effects, cuts, fades, clip additions, recordings…) appears here with an icon and colour code. Toggle effects on/off, delete individual actions, undo/redo with <kbd>Ctrl+Z</kbd> / <kbd>Ctrl+Y</kbd>.</p>
+<p><b>Right Panel — History</b>: every action you perform (effects, cuts, fades, clip additions, recordings…) appears here with an icon and colour code. Toggle any action on/off (● / ○), delete individually, undo/redo with <kbd>Ctrl+Z</kbd> / <kbd>Ctrl+Y</kbd>.</p>
 
 <!-- ═══════════════════════════════════ -->
 <h2>📂 Loading &amp; Saving</h2>
@@ -147,19 +147,10 @@ th { background: #1a1a30; color: #a78bfa; }
 • ↕ <b>Reorders</b> (grey) — Clip order changes.</p>
 
 <h3>Toggle On / Off</h3>
-<p>Effects and automations can be temporarily disabled by clicking ●. Audio is recalculated in real time. Structural actions (cuts, fades, additions…) cannot be toggled.</p>
+<p>Click ● to temporarily disable any action (effects, automations, cuts, fades, additions…). Audio is fully recalculated from the initial state by replaying all enabled actions in order.</p>
 
 <h3>Delete</h3>
-<p>Click ✕ to delete. Behaviour depends on the type:</p>
-<p>• <b>Effect after the last structural action</b>: removed and audio recalculated.<br>
-• <b>"Overridden" effect</b> (greyed out, before a structural action): removed with no recalculation needed.<br>
-• <b>Structural action</b>: confirmation required — all actions after it will also be removed.</p>
-
-<h3>"Overridden" state</h3>
-<p>Effects located before the last structural action appear greyed out and italic, labelled "overridden". They no longer contribute to the audio output. You can safely delete them with no impact.</p>
-
-<h3>Clear All</h3>
-<p>The ⟲ button at the top of the panel clears the entire history after confirmation. Audio reverts to its initial state.</p>
+<p>Click ✕ to delete any action. Confirmation required. Audio is recalculated without that action — all other actions remain intact.</p>
 
 <h3>Undo / Redo</h3>
 <p><kbd>Ctrl+Z</kbd> to undo, <kbd>Ctrl+Y</kbd> to redo. Works for all action types.</p>

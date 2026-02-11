@@ -35,7 +35,7 @@ th { background: #1a1a30; color: #a78bfa; }
 
 <p><b>Centre — Waveform &amp; Timeline</b> : l'espace de travail principal. En haut, la forme d'onde avec sélection, marqueurs et tête de lecture. En dessous, la timeline avec les clips colorés. Entre les deux, la barre de transport (Play/Pause/Stop, temps, volume). Analyseur de spectre en bas à droite.</p>
 
-<p><b>Panneau droit — Historique</b> : toutes les actions effectuées (effets, coupes, fondus, ajouts, enregistrements…) apparaissent ici avec icône et code couleur. Activez/désactivez les effets, supprimez des actions, annulez/refaites avec <kbd>Ctrl+Z</kbd> / <kbd>Ctrl+Y</kbd>.</p>
+<p><b>Panneau droit — Historique</b> : toutes les actions effectuées (effets, coupes, fondus, ajouts, enregistrements…) apparaissent ici avec icône et code couleur. Activez/désactivez n'importe quelle action (● / ○), supprimez individuellement, annulez/refaites avec <kbd>Ctrl+Z</kbd> / <kbd>Ctrl+Y</kbd>.</p>
 
 <!-- ═══════════════════════════════════ -->
 <h2>📂 Charger &amp; Sauvegarder</h2>
@@ -147,19 +147,10 @@ th { background: #1a1a30; color: #a78bfa; }
 • ↕ <b>Réorganisations</b> (gris) — Changements d'ordre.</p>
 
 <h3>Activer / Désactiver</h3>
-<p>Effets et automations : cliquez ● pour désactiver temporairement. L'audio est recalculé en temps réel. Les actions structurelles (coupes, fondus, ajouts…) ne peuvent pas être désactivées.</p>
+<p>Cliquez ● pour désactiver temporairement n'importe quelle action (effets, automations, coupes, fondus, ajouts…). L'audio est entièrement recalculé depuis l'état initial en rejouant toutes les actions activées dans l'ordre.</p>
 
 <h3>Supprimer</h3>
-<p>Cliquez ✕ pour supprimer. Le comportement dépend du type :</p>
-<p>• <b>Effet après la dernière action structurelle</b> : retiré, audio recalculé.<br>
-• <b>Effet « remplacé »</b> (grisé, avant une action structurelle) : retiré sans recalcul.<br>
-• <b>Action structurelle</b> : confirmation demandée — toutes les actions suivantes seront aussi supprimées.</p>
-
-<h3>État « remplacé »</h3>
-<p>Les effets situés avant la dernière action structurelle apparaissent grisés en italique avec « remplacé ». Ils ne contribuent plus au rendu. Supprimables sans impact.</p>
-
-<h3>Tout effacer</h3>
-<p>Bouton ⟲ en haut du panneau. Efface tout l'historique après confirmation. L'audio revient à son état initial.</p>
+<p>Cliquez ✕ pour supprimer n'importe quelle action. Confirmation demandée. L'audio est recalculé sans cette action — les autres actions restent intactes.</p>
 
 <h3>Annuler / Refaire</h3>
 <p><kbd>Ctrl+Z</kbd> annule, <kbd>Ctrl+Y</kbd> rétablit. Fonctionne pour tous les types d'actions.</p>
