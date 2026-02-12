@@ -785,7 +785,17 @@ class _FadeEnvelopeEditor(QWidget):
         _, ny = self._s2n(px, py)
         denom = 2.0 * t0 * (1.0 - t0)
         if abs(denom) < 0.01: return
-        self._bends[si] = self._clamp_bend(si, (ny - sy0) / denom)
+
+        # Clamp bend to segment bounds [min(y0,y1), max(y0,y1)]
+        new_bend = (ny - sy0) / denom
+        pts = sorted(self._pts, key=lambda p: p[0])
+        y0, y1 = pts[si][1], pts[si + 1][1]
+        mid = (y0 + y1) / 2.0
+        lo = max(0.0, min(y0, y1))
+        hi = min(1.0, max(y0, y1))
+        new_bend = max(lo - mid, min(hi - mid, new_bend))
+
+        self._bends[si] = new_bend
         self._bg_pm = None; self.update()
 
     def _release_bend(self):
@@ -879,10 +889,40 @@ class _FadeEnvelopeEditor(QWidget):
 
     def _render_bg(self):
         """Background pixmap : waveform + envelope + labels (cached)."""
+        from PyQt6.QtGui import QLinearGradient
         ax, ay, aw, ah, mid_y, scale = self._L()
         w, h = self.width(), self.height()
-        pm = QPixmap(w, h); pm.fill(QColor(COLORS['bg_dark']))
+        pm = QPixmap(w, h); pm.fill(QColor("#0d0d1a"))
         p = QPainter(pm); p.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        # ── Subtle background gradient ──
+        bg_grad = QLinearGradient(0, 0, 0, h)
+        bg_grad.setColorAt(0, QColor("#12122a"))
+        bg_grad.setColorAt(0.5, QColor("#0d0d1a"))
+        bg_grad.setColorAt(1, QColor("#12122a"))
+        p.fillRect(0, 0, w, h, bg_grad)
+
+        # ── Grid lines ──
+        grid_c = QColor("#ffffff"); grid_c.setAlpha(12)
+        p.setPen(QPen(grid_c, 1))
+        # Horizontal: 0%, 25%, 50%, 75%, 100%
+        for frac in [0.0, 0.25, 0.5, 0.75, 1.0]:
+            gy = int(mid_y - frac * scale)
+            p.drawLine(ax, gy, ax + aw, gy)
+            if frac > 0:
+                gy2 = int(mid_y + frac * scale)
+                p.drawLine(ax, gy2, ax + aw, gy2)
+        # Center line (brighter)
+        center_c = QColor("#ffffff"); center_c.setAlpha(25)
+        p.setPen(QPen(center_c, 1, Qt.PenStyle.DotLine))
+        p.drawLine(ax, int(mid_y), ax + aw, int(mid_y))
+        # Grid labels
+        lbl_c = QColor(COLORS['text_dim']); lbl_c.setAlpha(80)
+        p.setPen(lbl_c)
+        fnt = p.font(); fnt.setPixelSize(8); p.setFont(fnt)
+        for frac, txt in [(1.0, "100%"), (0.5, "50%"), (0.0, "0%")]:
+            gy = int(mid_y - frac * scale)
+            p.drawText(ax + 2, gy - 2, txt)
 
         pts = sorted(self._pts, key=lambda pt: pt[0])
         has_audio = self._audio is not None and aw > 2
@@ -904,27 +944,37 @@ class _FadeEnvelopeEditor(QWidget):
             env_px = np.interp(np.linspace(0, n - 1, aw),
                                np.arange(n), full_env).astype(np.float32)
 
-            # Ghost waveform (original)
-            dim_c = QColor(COLORS['text_dim']); dim_c.setAlpha(40)
+            # Ghost waveform (original) — very subtle
+            dim_c = QColor("#4a3a7a"); dim_c.setAlpha(50)
             p.setPen(QPen(dim_c, 1))
             for x in range(aw):
                 p.drawLine(ax + x, int(mid_y - self._pk_hi[x] * scale),
                            ax + x, int(mid_y - self._pk_lo[x] * scale))
 
-            # Faded waveform
-            p.setPen(QPen(QColor("#9d6dff"), 1))
+            # Faded waveform — gradient-colored per column
             for x in range(aw):
                 ev = env_px[x]
                 y1 = int(mid_y - self._pk_hi[x] * ev * scale)
                 y2 = int(mid_y - self._pk_lo[x] * ev * scale)
                 if y2 <= y1: y2 = y1 + 1
+                # Tint based on envelope value: purple when full, dim when faded
+                alpha = int(80 + 175 * ev)
+                wc = QColor("#b07aff"); wc.setAlpha(alpha)
+                p.setPen(QPen(wc, 1))
                 p.drawLine(ax + x, y1, ax + x, y2)
 
         if len(pts) >= 2:
             top_path = self._build_env_path(pts, mid_y, scale, -1)
             bot_path = self._build_env_path(pts, mid_y, scale, +1)
-            mask_c = QColor(COLORS['bg_dark']); mask_c.setAlpha(150)
-            p.setPen(Qt.PenStyle.NoPen); p.setBrush(QBrush(mask_c))
+
+            # ── Envelope fill with gradient ──
+            # Top mask (above top path = silence zone)
+            mask_grad = QLinearGradient(0, ay, 0, ay + ah)
+            mask_grad.setColorAt(0, QColor(13, 13, 26, 180))
+            mask_grad.setColorAt(0.5, QColor(13, 13, 26, 120))
+            mask_grad.setColorAt(1, QColor(13, 13, 26, 180))
+            p.setPen(Qt.PenStyle.NoPen)
+            p.setBrush(QBrush(mask_grad))
             tm = QPainterPath()
             tm.moveTo(ax, ay); tm.lineTo(ax + aw, ay)
             tm.connectPath(top_path.toReversed()); tm.closeSubpath()
@@ -932,16 +982,34 @@ class _FadeEnvelopeEditor(QWidget):
             bm = QPainterPath(bot_path)
             bm.lineTo(ax + aw, ay + ah); bm.lineTo(ax, ay + ah); bm.closeSubpath()
             p.drawPath(bm)
+
+            # ── Envelope glow (inner fill between curves) ──
+            glow_c = QColor("#7c3aed"); glow_c.setAlpha(18)
+            p.setBrush(QBrush(glow_c))
+            inner = QPainterPath(top_path)
+            inner.connectPath(bot_path.toReversed())
+            inner.closeSubpath()
+            p.drawPath(inner)
+
+            # ── Envelope curves — with glow ──
             p.setBrush(Qt.BrushStyle.NoBrush)
-            p.setPen(QPen(QColor("#e94560"), 2.0))
+            # Outer glow
+            glow = QColor("#ff6b8a"); glow.setAlpha(40)
+            p.setPen(QPen(glow, 5.0))
             p.drawPath(top_path); p.drawPath(bot_path)
+            # Main curve
+            p.setPen(QPen(QColor("#ff4d6d"), 2.2))
+            p.drawPath(top_path); p.drawPath(bot_path)
+
+            # Fade boundary line
             if has_audio:
                 zx0, zx1 = self._zone_px()
                 bx = zx1 if self._ft == "in" else zx0
-                p.setPen(QPen(QColor("#e9456050"), 1, Qt.PenStyle.DashLine))
+                bc = QColor("#ff4d6d"); bc.setAlpha(60)
+                p.setPen(QPen(bc, 1, Qt.PenStyle.DashLine))
                 p.drawLine(int(bx), ay, int(bx), ay + ah)
 
-        # Labels
+        # ── Bottom labels ──
         p.setPen(QColor(COLORS['text_dim']))
         fnt = p.font(); fnt.setPixelSize(9); p.setFont(fnt)
         if has_audio:
@@ -963,7 +1031,7 @@ class _FadeEnvelopeEditor(QWidget):
         p.drawPixmap(0, 0, self._bg_pm)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
 
-        # Control points (live overlay)
+        # ── Control points (live overlay) ──
         pts = sorted(self._pts, key=lambda pt: pt[0])
         zx0, zx1 = self._zone_px(); zw = max(1, zx1 - zx0)
         for i, (cx, cy) in enumerate(pts):
@@ -974,34 +1042,48 @@ class _FadeEnvelopeEditor(QWidget):
                 self._drag and self._drag[0] == 'pt'
                 and self._drag[1] < len(self._pts)
                 and i == self._sorted_pos(self._drag[1]))
+
             if locked:
                 sz = 4
-                col = QColor("#b8a9e8") if is_hl else QColor("#8b7dc8")
+                col = QColor("#b8a9e8") if is_hl else QColor("#7c6db8")
                 p.setPen(QPen(QColor("#d4d0e8"), 1.2))
             else:
-                sz = 7 if is_hl else 5
-                col = QColor("#ff6b6b") if is_hl else QColor("#e94560")
+                sz = 8 if is_hl else 5
+                col = QColor("#ff6b6b") if is_hl else QColor("#ff4d6d")
+                # Glow halo on hover
+                if is_hl:
+                    glow = QColor("#ff4d6d"); glow.setAlpha(50)
+                    p.setPen(Qt.PenStyle.NoPen); p.setBrush(QBrush(glow))
+                    p.drawEllipse(QPointF(sx, sy_t), sz + 4, sz + 4)
+                    p.drawEllipse(QPointF(sx, sy_b), sz + 4, sz + 4)
                 p.setPen(QPen(QColor("white"), 1.5))
             p.setBrush(QBrush(col))
             p.drawEllipse(QPointF(sx, sy_t), sz, sz)
             p.drawEllipse(QPointF(sx, sy_b), sz, sz)
 
-        # Playback cursor
+        # ── Playback cursor ──
         if 0 <= self._play_pos <= 1:
             pp = ax + int(self._play_pos * aw)
+            # Glow
+            gc = QColor("#00d2ff"); gc.setAlpha(40)
+            p.setPen(QPen(gc, 6))
+            p.drawLine(pp, ay, pp, ay + ah)
+            # Solid line
             p.setPen(QPen(QColor("#00d2ff"), 2))
             p.drawLine(pp, ay, pp, ay + ah)
 
-        # Mode hint
+        # ── Mode hint — bottom right, subtle ──
         fnt = p.font(); fnt.setPixelSize(8); p.setFont(fnt)
-        hc = QColor(COLORS['text_dim']); hc.setAlpha(140); p.setPen(hc)
-        txt = ("Clic = ajouter  |  Glisser = déplacer  |  Clic droit = supprimer"
+        hc = QColor(COLORS['text_dim']); hc.setAlpha(100); p.setPen(hc)
+        txt = ("Clic = ajouter  ·  Glisser = déplacer  ·  Clic droit = supprimer"
                if self._mode == self.MODE_POINTS
                else "Glissez un segment pour le courber")
-        p.drawText(QRectF(ax, ay + 2, aw, 12), Qt.AlignmentFlag.AlignCenter, txt)
+        p.drawText(QRectF(ax, ay + ah - 14, aw, 12), Qt.AlignmentFlag.AlignCenter, txt)
 
-        p.setPen(QPen(QColor(COLORS['border']), 1)); p.setBrush(Qt.BrushStyle.NoBrush)
-        p.drawRect(0, 0, self.width() - 1, self.height() - 1)
+        # ── Rounded border ──
+        border_c = QColor(COLORS['border']); border_c.setAlpha(80)
+        p.setPen(QPen(border_c, 1)); p.setBrush(Qt.BrushStyle.NoBrush)
+        p.drawRoundedRect(1, 1, self.width() - 2, self.height() - 2, 6, 6)
         p.end()
 
 
@@ -1026,7 +1108,7 @@ class FadeDialog(QDialog):
         self._is_playing = False
         title = f"Fade {'In' if fade_type == 'in' else 'Out'}"
         self.setWindowTitle(title)
-        self.setFixedSize(520, 440)
+        self.setFixedSize(560, 500)
         self.setStyleSheet(f"QDialog {{ background: {COLORS['bg_medium']}; }}")
 
         self.duration_ms = min(500, clip_duration_ms)

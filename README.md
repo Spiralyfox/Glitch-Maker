@@ -22,7 +22,7 @@ Glitch Maker permet de transformer radicalement un fichier audio en lui appliqua
 
 **Historique complet** — Toutes les actions sont tracées dans le panneau Historique avec icônes et couleurs par type (effets, automations, coupes, fondus, ajouts, enregistrements, suppressions, duplications, réorganisations). Toutes les actions sont activables/désactivables et supprimables individuellement — l'audio est entièrement recalculé depuis l'état initial en rejouant les actions activées dans l'ordre. Le mapping de coordonnées (v7) garantit que les coupes et effets s'appliquent toujours à la bonne zone audio, même quand des opérations antérieures sont désactivées. Annuler/refaire avec Ctrl+Z / Ctrl+Y.
 
-**Automations** — Automatisez un ou plusieurs paramètres d'effet au fil du temps, comme dans FL Studio. Sélectionnez une zone, choisissez un effet, cochez les paramètres à automatiser (avec courbe éditable From → To) ou à fixer en valeur constante. Aperçu waveform en temps réel (grise = original, violette = traité). Prévisualisation audio avec barre de lecture. Les automations s'empilent sur l'audio avec tous les effets déjà appliqués.
+**Automations** — Automatisez un ou plusieurs paramètres d'effet au fil du temps, comme dans FL Studio. Sélectionnez une zone, choisissez un effet, cochez les paramètres à automatiser (avec courbe éditable From → To) ou à fixer en valeur constante. L'éditeur de courbe propose deux modes : **Points** (ajouter, déplacer, supprimer des points de contrôle) et **Bend** (courber les segments en Bézier quadratique). Aperçu waveform en temps réel (grise = original, violette = traité). Prévisualisation audio avec barre de lecture.
 
 **Sélection intelligente** — Pendant la lecture, glisser pour sélectionner met automatiquement en pause. En relâchant, la lecture reprend dans la zone sélectionnée.
 
@@ -93,7 +93,7 @@ Glitch Maker lets you radically transform an audio file by applying non-destruct
 
 **Full history** — All actions are tracked in the History panel with icons and colours by type (effects, automations, cuts, fades, additions, recordings, deletions, duplications, reorders). All actions can be toggled on/off and deleted individually — audio is fully recalculated from the initial state by replaying enabled actions in order. Coordinate mapping (v7) ensures cuts and effects always apply to the correct audio region, even when earlier operations are disabled. Undo/redo with Ctrl+Z / Ctrl+Y.
 
-**Automations** — Automate one or more effect parameters over time, like in FL Studio. Select a region, choose an effect, check parameters to automate (with editable From → To curve) or set as constant. Real-time waveform preview (grey = original, purple = processed). Audio preview with playback bar. Automations stack on top of all previously applied effects.
+**Automations** — Automate one or more effect parameters over time, like in FL Studio. Select a region, choose an effect, check parameters to automate (with editable From → To curve) or set as constant. The curve editor offers two modes: **Points** (add, move, delete control points) and **Bend** (curve segments with quadratic Bézier). Real-time waveform preview (grey = original, purple = processed). Audio preview with playback bar.
 
 **Smart selection** — While playing, dragging to select automatically pauses. On release, playback resumes inside the selected region.
 

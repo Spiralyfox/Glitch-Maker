@@ -171,16 +171,19 @@ th { background: #1a1a30; color: #a78bfa; }
 <p>1. Glissez sur la mini waveform pour sélectionner une zone.<br>
 2. Cliquez <b>Add Automation</b>, nommez-la, choisissez un effet.<br>
 3. Cochez les paramètres. Chaque paramètre peut être <b>Automated</b> (From → To avec courbe) ou <b>Constant</b> (valeur fixe).<br>
-4. Dessinez les courbes : clic gauche = ajouter un point, glissez = modifier, clic droit = supprimer.<br>
+4. L'éditeur de courbe propose deux modes, sélectionnables en haut du graphique :<br>
+&nbsp;&nbsp;• <b>Points</b> — Clic gauche = ajouter un point. Glissez = déplacer. Clic droit = supprimer (sauf les extrémités).<br>
+&nbsp;&nbsp;• <b>Bend</b> — Glissez un segment entre deux points pour le courber (Bézier quadratique). Vers le haut = montée rapide puis plateau. Vers le bas = plateau puis montée tardive.<br>
 5. La preview waveform en bas montre le résultat en temps réel (grise = original, violette = traité).<br>
 6. <kbd>Espace</kbd> pour prévisualiser avec barre de lecture. <b>Save</b> pour appliquer.</p>
 
-<div class="tip">💡 L'automation s'applique par-dessus les effets déjà dans votre chaîne.</div>
+<div class="tip">💡 L'automation s'applique par-dessus les effets déjà dans votre chaîne. Les courbes sont sauvegardées avec le projet.</div>
 
 <h3>Gérer</h3>
 <p><b>ON/OFF</b> — Désactivez/réactivez. <b>Edit</b> — Rouvrez l'éditeur. <b>Del</b> — Supprimez. <b>Redefine region</b> — Changez la zone sans fermer l'éditeur.</p>
 
-<div class="audio-desc">🔊 Exemples : Filter Cutoff de 200 Hz à 8000 Hz avec Resonance constante = ouverture cinématique. Bitcrusher Bit Depth à 8, Downsample de 1 à 32 = désintégration progressive. Volume 100 % → 0 % = fade-out personnalisé avec contrôle total de la courbe.</div>
+<div class="audio-desc">🔊 Exemples : Filter Cutoff de 200 Hz à 8000 Hz avec une courbe en Bend = ouverture cinématique progressive. Bitcrusher Bit Depth à 8, Downsample de 1 à 32 = désintégration progressive. Volume 100 % → 0 % = fade-out personnalisé avec contrôle total de la courbure.</div>
+
 
 <!-- ═══════════════════════════════════ -->
 <h2>Effets — Référence complète</h2>

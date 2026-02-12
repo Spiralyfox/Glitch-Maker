@@ -39,8 +39,21 @@ AUTOMATABLE_PARAMS = {
 }
 
 
-def interpolate_curve(points: list, x: float) -> float:
-    """Interpolate y value at normalized x (0-1) from sorted control points."""
+def _bezier_y(y0: float, y1: float, bend: float, t: float) -> float:
+    """Quadratic Bézier Y at parameter *t* with control-point shifted by *bend*."""
+    if abs(bend) < 0.005:
+        return y0 + t * (y1 - y0)
+    cy = (y0 + y1) / 2.0 + bend
+    u = 1.0 - t
+    return u * u * y0 + 2.0 * u * t * cy + t * t * y1
+
+
+def interpolate_curve(points: list, x: float, bends: list | None = None) -> float:
+    """Interpolate y value at normalized x (0-1) from sorted control points.
+
+    If *bends* is provided (one float per segment), quadratic Bézier
+    interpolation is used instead of linear.
+    """
     if not points:
         return 0.0
     if len(points) == 1:
@@ -56,7 +69,8 @@ def interpolate_curve(points: list, x: float) -> float:
             if x1 == x0:
                 return y0
             t = (x - x0) / (x1 - x0)
-            return y0 + t * (y1 - y0)
+            b = bends[i] if bends and i < len(bends) else 0.0
+            return _bezier_y(y0, y1, b, t)
     return points[-1][1]
 
 
@@ -106,7 +120,8 @@ def apply_automation_multi(audio: np.ndarray, start: int, end: int,
                 val = ap["value"]
             else:
                 curve = ap.get("curve_points", [(0, 0), (1, 1)])
-                ny = interpolate_curve(curve, norm_x)
+                bends = ap.get("curve_bends")
+                ny = interpolate_curve(curve, norm_x, bends)
                 dv = ap.get("default_val", 0)
                 tv = ap.get("target_val", 1)
                 val = dv + ny * (tv - dv)

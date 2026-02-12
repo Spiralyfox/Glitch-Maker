@@ -286,20 +286,104 @@ class _AutoPreviewWaveform(QWidget):
 # ═══════════════════════════════════════
 
 class _CurveEditor(QWidget):
-    """Editable automation curve with draggable control points."""
+    """Editable automation curve with draggable control points and Bézier bends.
+
+    Two editing modes (like FL Studio / FadeDialog):
+      MODE_POINTS — add / move / delete control points (straight lines)
+      MODE_BEND   — drag a segment to curve it (quadratic Bézier)
+    """
     curve_changed = pyqtSignal()
+    MODE_POINTS = 0
+    MODE_BEND = 1
+    MODE_DRAW = 2
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setMinimumHeight(120)
+        self.setMinimumHeight(180)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        self._points: list[tuple[float, float]] = [(0.0, 0.0), (1.0, 1.0)]
-        self._dragging_idx: int | None = None
+        self._points: list[list[float]] = [[0.0, 0.0], [1.0, 1.0]]
+        self._bends: list[float] = [0.0]
+        self._mode = self.MODE_POINTS
+        self._drag = None          # ('pt', idx) or ('bend', seg_idx, t0, interp_y0)
         self._hover_idx: int | None = None
+        self._hover_mode: int | None = None   # which mode tab is hovered
+
+        # Draw Mode state
+        self._draw_path: list[tuple[float, float]] = []
+        self._is_drawing = False
+
+        # Undo/Redo
+        self._undo_stack = []
+        self._redo_stack = []
+
         self._param_name = "Parameter"
         self._target_label = ""
         self._default_label = ""
+        self.setMouseTracking(True)
         self.setCursor(QCursor(Qt.CursorShape.CrossCursor))
+
+    def keyPressEvent(self, e):
+        # Undo / Redo
+        if e.modifiers() & Qt.KeyboardModifier.ControlModifier:
+            if e.key() == Qt.Key.Key_Z:
+                if e.modifiers() & Qt.KeyboardModifier.ShiftModifier:
+                    self.redo()
+                else:
+                    self.undo()
+                return
+            elif e.key() == Qt.Key.Key_Y:
+                self.redo()
+                return
+        super().keyPressEvent(e)
+
+    def _push_undo(self):
+        # State = (deep copy of points, copy of bends)
+        pts = [list(p) for p in self._points]
+        bends = list(self._bends)
+        self._undo_stack.append((pts, bends))
+        if len(self._undo_stack) > 50:
+            self._undo_stack.pop(0)
+        self._redo_stack.clear()
+
+    def undo(self):
+        if not self._undo_stack:
+            return
+        # Save current for redo
+        curr_pts = [list(p) for p in self._points]
+        curr_bends = list(self._bends)
+        self._redo_stack.append((curr_pts, curr_bends))
+        
+        # Pop undo
+        pts, bends = self._undo_stack.pop()
+        self._points = pts
+        self._bends = bends
+        self.curve_changed.emit()
+        self.update()
+
+    def redo(self):
+        if not self._redo_stack:
+            return
+        # Save current for undo
+        curr_pts = [list(p) for p in self._points]
+        curr_bends = list(self._bends)
+        self._undo_stack.append((curr_pts, curr_bends))
+
+        # Pop redo
+        pts, bends = self._redo_stack.pop()
+        self._points = pts
+        self._bends = bends
+        self.curve_changed.emit()
+        self.update()
+
+    # ── public API ──
+
+    def set_mode(self, m):
+        self._mode = m
+        self._drag = None
+        self._hover_idx = None
+        self.setCursor(Qt.CursorShape.CrossCursor if m == self.MODE_POINTS
+                       else Qt.CursorShape.SizeVerCursor)
+        self.update()
 
     def set_labels(self, param_name, default_val, target_val):
         self._param_name = param_name
@@ -308,19 +392,38 @@ class _CurveEditor(QWidget):
         self.update()
 
     def get_points(self):
-        return sorted(self._points, key=lambda p: p[0])
+        return sorted([tuple(p) for p in self._points], key=lambda p: p[0])
+
+    def get_bends(self):
+        return list(self._bends)
 
     def set_points(self, pts):
-        self._points = list(pts) if pts else [(0.0, 0.0), (1.0, 1.0)]
+        self._points = [list(p) for p in pts] if pts else [[0.0, 0.0], [1.0, 1.0]]
+        self._sync_bends()
+        self.update()
+
+    def set_bends(self, bends):
+        self._bends = list(bends) if bends else [0.0] * max(0, len(self._points) - 1)
+        self._sync_bends()
         self.update()
 
     def reset_linear(self):
-        self._points = [(0.0, 0.0), (1.0, 1.0)]
+        self._points = [[0.0, 0.0], [1.0, 1.0]]
+        self._bends = [0.0]
         self.curve_changed.emit()
         self.update()
 
+    # ── geometry helpers ──
+
+    def _sync_bends(self):
+        need = max(0, len(self._points) - 1)
+        while len(self._bends) < need:
+            self._bends.append(0.0)
+        while len(self._bends) > need:
+            self._bends.pop()
+
     def _pad(self):
-        return 40, 16, 16, 24
+        return 40, 54, 16, 24   # left, top (room for mode bar + spacing), right, bottom
 
     def _to_pixel(self, nx, ny):
         l, t, r, b = self._pad()
@@ -334,61 +437,296 @@ class _CurveEditor(QWidget):
         dh = self.height() - t - b
         if dw == 0 or dh == 0:
             return 0, 0
+        # Clamp py within the graph area
+        py = max(t, min(self.height() - b, py))
         nx = max(0, min(1, (px - l) / dw))
         ny = max(0, min(1, 1 - (py - t) / dh))
         return nx, ny
 
-    def mousePressEvent(self, e: QMouseEvent):
-        if e.button() == Qt.MouseButton.LeftButton:
-            px, py = e.position().x(), e.position().y()
-            for i, (x, y) in enumerate(self._points):
-                sx, sy = self._to_pixel(x, y)
-                if abs(px - sx) < 10 and abs(py - sy) < 10:
-                    self._dragging_idx = i
-                    return
+    def _sorted_pos(self, idx):
+        order = sorted(range(len(self._points)), key=lambda i: self._points[i][0])
+        return order.index(idx)
+
+    def _is_endpoint(self, idx):
+        pos = self._sorted_pos(idx)
+        return pos == 0 or pos == len(self._points) - 1
+
+    def _near_pt(self, px, py, rad=12):
+        best, best_d = None, rad * rad
+        for i, (x, y) in enumerate(self._points):
+            sx, sy = self._to_pixel(x, y)
+            d = (px - sx) ** 2 + (py - sy) ** 2
+            if d < best_d:
+                best_d = d
+                best = i
+        return best
+
+    def _near_seg(self, px, py, rad=16):
+        from core.automation import _bezier_y
+        pts = sorted(self._points, key=lambda p: p[0])
+        for si in range(len(pts) - 1):
+            x0, y0 = pts[si]
+            x1, y1 = pts[si + 1]
+            sx0, _ = self._to_pixel(x0, y0)
+            sx1, _ = self._to_pixel(x1, y1)
+            if not (sx0 - 8 <= px <= sx1 + 8) or (sx1 - sx0) < 3:
+                continue
+            t = max(0.05, min(0.95, (px - sx0) / (sx1 - sx0)))
+            bd = self._bends[si] if si < len(self._bends) else 0.0
+            by = _bezier_y(y0, y1, bd, t)
+            _, sy_curve = self._to_pixel(0, by)
+            if abs(py - sy_curve) < rad:
+                return si, t
+        return None
+
+    # ── mouse — POINTS mode ──
+
+    def _press_pts(self, px, py, btn):
+        _, t, _, b = self._pad()
+        if btn == Qt.MouseButton.LeftButton:
+            pi = self._near_pt(px, py)
+            if pi is not None:
+                self._push_undo()
+                self._drag = ('pt', pi)
+                return
+            # Only add points if clicking inside the graph area
+            if py < t or py > self.height() - b:
+                return
+            
+            self._push_undo()
             nx, ny = self._from_pixel(px, py)
-            self._points.append((nx, ny))
+            # Find which segment we're inserting into
+            spts = sorted(self._points, key=lambda p: p[0])
+            seg = 0
+            for i in range(len(spts) - 1):
+                if spts[i][0] <= nx <= spts[i + 1][0]:
+                    seg = i
+                    break
+            self._points.append([nx, ny])
             self._points.sort(key=lambda p: p[0])
-            self._dragging_idx = next(i for i, pt in enumerate(self._points) if pt == (nx, ny))
+            # Split the bend of that segment into two zero-bends
+            self._bends[seg:seg + 1] = [0.0, 0.0]
+            self._sync_bends()
+            ni = next(i for i, p in enumerate(self._points) if p == [nx, ny])
+            self._drag = ('pt', ni)
             self.curve_changed.emit()
             self.update()
-        elif e.button() == Qt.MouseButton.RightButton:
-            if len(self._points) <= 2:
-                return
-            px, py = e.position().x(), e.position().y()
-            for i, (x, y) in enumerate(self._points):
-                sx, sy = self._to_pixel(x, y)
-                if abs(px - sx) < 12 and abs(py - sy) < 12:
-                    self._points.pop(i)
-                    self.curve_changed.emit()
-                    self.update()
-                    return
+        elif btn == Qt.MouseButton.RightButton:
+            self._try_delete(px, py)
 
-    def mouseMoveEvent(self, e: QMouseEvent):
-        px, py = e.position().x(), e.position().y()
-        if self._dragging_idx is not None:
+    def _move_pts(self, px, py):
+        if self._drag and self._drag[0] == 'pt':
+            idx = self._drag[1]
             nx, ny = self._from_pixel(px, py)
-            self._points[self._dragging_idx] = (nx, ny)
+            self._points[idx] = [nx, ny]
             self.curve_changed.emit()
             self.update()
         else:
             old = self._hover_idx
-            self._hover_idx = None
-            for i, (x, y) in enumerate(self._points):
-                sx, sy = self._to_pixel(x, y)
-                if abs(px - sx) < 10 and abs(py - sy) < 10:
-                    self._hover_idx = i; break
-            if old != self._hover_idx:
+            self._hover_idx = self._near_pt(px, py)
+            if self._hover_idx != old:
                 self.update()
 
-    def mouseReleaseEvent(self, e: QMouseEvent):
-        if self._dragging_idx is not None:
-            self._dragging_idx = None
+    def _release_pts(self):
+        if self._drag and self._drag[0] == 'pt':
             self._points.sort(key=lambda p: p[0])
+            self._sync_bends()
+            self._drag = None
             self.curve_changed.emit()
             self.update()
 
+    def _try_delete(self, px, py):
+        if len(self._points) <= 2:
+            return
+        pi = self._near_pt(px, py, 14)
+        if pi is None or self._is_endpoint(pi):
+            return
+        
+        self._push_undo()
+        pos = self._sorted_pos(pi)
+        if 0 < pos <= len(self._bends):
+            self._bends[pos - 1:pos + 1] = [0.0]
+        self._points.pop(pi)
+        self._sync_bends()
+        self.curve_changed.emit()
+        self.update()
+
+    # ── mouse — BEND mode ──
+
+    def _press_bend(self, px, py, btn):
+        if btn != Qt.MouseButton.LeftButton:
+            return
+        seg = self._near_seg(px, py, 20)
+        if seg is None:
+            return
+        
+        self._push_undo()
+        si, t0 = seg
+        pts = sorted(self._points, key=lambda p: p[0])
+        y0, y1 = pts[si][1], pts[si + 1][1]
+        interp_y0 = y0 + t0 * (y1 - y0)
+        self._drag = ('bend', si, t0, interp_y0)
+
+    # ... (move_bend, release_bend unchanged) ...
+
+    def _move_bend(self, px, py):
+        if not (self._drag and self._drag[0] == 'bend'):
+            return
+        si, t0, interp_y0 = self._drag[1], self._drag[2], self._drag[3]
+        _, ny = self._from_pixel(px, py)
+        denom = 2.0 * t0 * (1.0 - t0)
+        if abs(denom) < 0.01:
+            return
+        new_bend = (ny - interp_y0) / denom
+        # Clamp: control point = (y0+y1)/2 + bend must stay within
+        # [min(y0,y1), max(y0,y1)] AND [0, 1]
+        pts = sorted(self._points, key=lambda p: p[0])
+        y0, y1 = pts[si][1], pts[si + 1][1]
+        mid = (y0 + y1) / 2.0
+        lo = max(0.0, min(y0, y1))
+        hi = min(1.0, max(y0, y1))
+        new_bend = max(lo - mid, min(hi - mid, new_bend))
+        self._bends[si] = new_bend
+        self.curve_changed.emit()
+        self.update()
+
+    def _release_bend(self):
+        if self._drag and self._drag[0] == 'bend':
+            self._drag = None
+            self.curve_changed.emit()
+            self.update()
+
+    # ── DRAW Mode ──
+
+    def _press_draw(self, px, py, btn):
+        if btn == Qt.MouseButton.LeftButton:
+            self._push_undo()
+            self._is_drawing = True
+            self._draw_path = []
+            nx, ny = self._from_pixel(px, py)
+            nx = max(0.0, min(1.0, nx))
+            ny = max(0.0, min(1.0, ny))
+            self._draw_path.append((nx, ny))
+            self.update()
+
+    def _move_draw(self, px, py):
+        if self._is_drawing:
+            nx, ny = self._from_pixel(px, py)
+            nx = max(0.0, min(1.0, nx))
+            ny = max(0.0, min(1.0, ny))
+            if not self._draw_path or abs(nx - self._draw_path[-1][0]) > 0.005:
+                 self._draw_path.append((nx, ny))
+            self.update()
+
+    def _release_draw(self):
+        if self._is_drawing:
+            self._is_drawing = False
+            if len(self._draw_path) < 2: return
+
+            self._draw_path.sort(key=lambda p: p[0])
+            # Finer simplification for detailed curves
+            simplified = self._rdp_simplify(self._draw_path, epsilon=0.004)
+            
+            # Ensure start/end at 0 and 1
+            if simplified[0][0] > 0.0: simplified.insert(0, (0.0, simplified[0][1]))
+            else: simplified[0] = (0.0, simplified[0][1])
+            if simplified[-1][0] < 1.0: simplified.append((1.0, simplified[-1][1]))
+            else: simplified[-1] = (1.0, simplified[-1][1])
+
+            self._points = [[float(x), float(y)] for x, y in simplified]
+            self._bends = [0.0] * (len(self._points) - 1)
+            self._draw_path = []
+            self.curve_changed.emit()
+            self.update()
+
+    def _rdp_simplify(self, points, epsilon):
+        if len(points) < 3: return points
+        dmax = 0.0
+        index = 0
+        end = len(points) - 1
+        p1 = points[0]; p2 = points[end]
+        dx = p2[0] - p1[0]; dy = p2[1] - p1[1]
+        align_dist = (dx*dx + dy*dy)**0.5
+        
+        if align_dist == 0: return [points[0]]
+
+        for i in range(1, end):
+             p = points[i]
+             d = abs(dy*p[0] - dx*p[1] + p2[0]*p1[1] - p2[1]*p1[0]) / align_dist
+             if d > dmax:
+                 index = i; dmax = d
+
+        if dmax > epsilon:
+            rec1 = self._rdp_simplify(points[:index+1], epsilon)
+            rec2 = self._rdp_simplify(points[index:], epsilon)
+            return rec1[:-1] + rec2
+        else:
+            return [points[0], points[end]]
+
+    # ── mouse dispatch ──
+
+    def mousePressEvent(self, e: QMouseEvent):
+        px, py = e.position().x(), e.position().y()
+        # Check mode bar (y=8, h=22)
+        if 8 <= py <= 30:
+            l, _, r, _ = self._pad()
+            dw = self.width() - l - r
+            bar_w = min(180, dw)
+            bar_x = l + (dw - bar_w) // 2
+            btn_w = (bar_w - 12) // 3
+            if bar_x <= px <= bar_x + btn_w:
+                self.set_mode(self.MODE_POINTS); return
+            elif bar_x + btn_w + 6 <= px <= bar_x + 2 * btn_w + 6:
+                self.set_mode(self.MODE_BEND); return
+            elif bar_x + 2 * btn_w + 12 <= px <= bar_x + 3 * btn_w + 12:
+                self.set_mode(self.MODE_DRAW); return
+        
+        # Graph bounds check
+        l, t, r, b = self._pad()
+        if not (l <= px <= self.width() - r and t <= py <= self.height() - b): return
+
+        if self._mode == self.MODE_POINTS:
+            self._press_pts(px, py, e.button())
+        elif self._mode == self.MODE_BEND:
+            self._press_bend(px, py, e.button())
+        elif self._mode == self.MODE_DRAW:
+            self._press_draw(px, py, e.button())
+
+    def mouseMoveEvent(self, e: QMouseEvent):
+        px, py = e.position().x(), e.position().y()
+        # Track hover over mode toolbar
+        old_hm = self._hover_mode
+        if 8 <= py <= 30:
+            l, _, r, _ = self._pad()
+            dw = self.width() - l - r
+            bar_w = min(180, dw)
+            bar_x = l + (dw - bar_w) // 2
+            btn_w = (bar_w - 12) // 3
+            in_pts = bar_x <= px <= bar_x + btn_w
+            in_bend = bar_x + btn_w + 6 <= px <= bar_x + 2 * btn_w + 6
+            in_draw = bar_x + 2 * btn_w + 12 <= px <= bar_x + 3 * btn_w + 12
+            self._hover_mode = 0 if in_pts else (1 if in_bend else (2 if in_draw else None))
+            self.setCursor(Qt.CursorShape.PointingHandCursor if self._hover_mode is not None else Qt.CursorShape.ArrowCursor)
+        else:
+            self._hover_mode = None
+            if self._mode == self.MODE_POINTS: self.setCursor(Qt.CursorShape.CrossCursor)
+            elif self._mode == self.MODE_DRAW: self.setCursor(Qt.CursorShape.ArrowCursor) # Pen cursor ideally
+            else: self.setCursor(Qt.CursorShape.SizeAllCursor)
+        if old_hm != self._hover_mode: self.update()
+
+        if self._mode == self.MODE_POINTS: self._move_pts(px, py)
+        elif self._mode == self.MODE_BEND: self._move_bend(px, py)
+        elif self._mode == self.MODE_DRAW: self._move_draw(px, py)
+
+    def mouseReleaseEvent(self, e: QMouseEvent):
+        if self._mode == self.MODE_POINTS: self._release_pts()
+        elif self._mode == self.MODE_BEND: self._release_bend()
+        elif self._mode == self.MODE_DRAW: self._release_draw()
+
+    # ── painting ──
+
     def paintEvent(self, e: QPaintEvent):
+        from core.automation import _bezier_y
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
         w, h = self.width(), self.height()
@@ -397,6 +735,56 @@ class _CurveEditor(QWidget):
         dw, dh = w - l - r, h - t - b
         p.fillRect(0, 0, w, h, QColor(C['bg_dark']))
 
+        # ── Mode toolbar ──
+        # ── Mode toolbar ──
+        bar_h = 22
+        bar_y = 8
+        bar_w = min(180, dw)
+        bar_x = l + (dw - bar_w) // 2
+        gap = 6
+        # 3 buttons: Points, Bend, Draw
+        btn_w = (bar_w - 2 * gap) // 3
+        
+        modes = ["Points", "Bend", "Draw"]
+        for idx, label in enumerate(modes):
+            bx = bar_x + idx * (btn_w + gap)
+            brect = QRectF(bx, bar_y, btn_w, bar_h)
+            
+            is_active = (idx == self._mode)
+            is_hover = (idx == self._hover_mode)
+            
+            # Background
+            if is_active:
+                bg = QColor("#7c3aed"); bg.setAlpha(180)
+            elif is_hover:
+                bg = QColor(C['accent_hover']); bg.setAlpha(140)
+            else:
+                bg = QColor(C['button_bg'])
+                
+            p.setPen(Qt.PenStyle.NoPen); p.setBrush(QBrush(bg))
+            p.drawRoundedRect(brect, 4, 4)
+            
+            # Text
+            tc = QColor("white") if (is_active or is_hover) else QColor(C['text_dim'])
+            p.setPen(tc)
+            fnt = p.font(); fnt.setBold(is_active)
+            fnt.setPixelSize(10 if is_active else 9)
+            p.setFont(fnt)
+            p.drawText(brect, Qt.AlignmentFlag.AlignCenter, label)
+
+        # ── Draw Path (raw) ──
+        if self._is_drawing and len(self._draw_path) > 1:
+            p.setPen(QPen(QColor(C['accent']), 2, Qt.PenStyle.DotLine))
+            path = QPainterPath()
+            sx, sy = self._to_pixel(*self._draw_path[0])
+            path.moveTo(sx, sy)
+            for nx, ny in self._draw_path[1:]:
+                sx, sy = self._to_pixel(nx, ny)
+                path.lineTo(sx, sy)
+            p.setBrush(Qt.BrushStyle.NoBrush)
+            p.drawPath(path)
+
+        # ── Grid ──
         p.setPen(QPen(QColor(C['border']), 1, Qt.PenStyle.DotLine))
         for frac in [0.25, 0.5, 0.75]:
             y = int(t + dh * (1 - frac))
@@ -408,47 +796,102 @@ class _CurveEditor(QWidget):
         p.drawLine(l, t, l, h - b)
         p.drawLine(l, h - b, w - r, h - b)
 
-        fnt = p.font(); fnt.setPixelSize(9); p.setFont(fnt)
+        # ── Axis labels ──
+        fnt = p.font()
+        fnt.setPixelSize(9)
+        fnt.setBold(False)
+        p.setFont(fnt)
         p.setPen(QColor(C['text_dim']))
         p.drawText(2, t + 4, self._target_label or "max")
         p.drawText(2, h - b + 3, self._default_label or "min")
-        fnt.setPixelSize(10); p.setFont(fnt)
+        fnt.setPixelSize(10)
+        p.setFont(fnt)
         p.setPen(QColor(C['accent']))
-        p.drawText(QRectF(l, 2, dw, 14), Qt.AlignmentFlag.AlignCenter, self._param_name)
+        p.drawText(QRectF(l, bar_y + bar_h + 1, dw, 12),
+                   Qt.AlignmentFlag.AlignCenter, self._param_name)
 
+        # ── Curve rendering ──
         sorted_pts = sorted(self._points, key=lambda pt: pt[0])
         if len(sorted_pts) >= 2:
+            # Fill path (area under curve)
             fill_path = QPainterPath()
             sx, sy = self._to_pixel(sorted_pts[0][0], sorted_pts[0][1])
             fill_path.moveTo(sx, t + dh)
             fill_path.lineTo(sx, sy)
-            for pt in sorted_pts[1:]:
-                px2, py2 = self._to_pixel(pt[0], pt[1])
-                fill_path.lineTo(px2, py2)
+            for si in range(len(sorted_pts) - 1):
+                x0, y0 = sorted_pts[si]
+                x1, y1 = sorted_pts[si + 1]
+                sx1, sy1 = self._to_pixel(x1, y1)
+                bd = self._bends[si] if si < len(self._bends) else 0.0
+                if abs(bd) < 0.005:
+                    fill_path.lineTo(sx1, sy1)
+                else:
+                    cx = (x0 + x1) / 2
+                    cy = (y0 + y1) / 2 + bd
+                    cpx, cpy = self._to_pixel(cx, cy)
+                    fill_path.quadTo(cpx, cpy, sx1, sy1)
             ex, ey = self._to_pixel(sorted_pts[-1][0], sorted_pts[-1][1])
             fill_path.lineTo(ex, t + dh)
             fill_path.closeSubpath()
-            fc = QColor("#7c3aed"); fc.setAlpha(30)
-            p.setPen(Qt.PenStyle.NoPen); p.setBrush(QBrush(fc)); p.drawPath(fill_path)
+            fc = QColor("#7c3aed")
+            fc.setAlpha(30)
+            p.setPen(Qt.PenStyle.NoPen)
+            p.setBrush(QBrush(fc))
+            p.drawPath(fill_path)
 
+            # Curve line
             curve_path = QPainterPath()
             sx, sy = self._to_pixel(sorted_pts[0][0], sorted_pts[0][1])
             curve_path.moveTo(sx, sy)
-            for pt in sorted_pts[1:]:
-                px2, py2 = self._to_pixel(pt[0], pt[1])
-                curve_path.lineTo(px2, py2)
+            for si in range(len(sorted_pts) - 1):
+                x0, y0 = sorted_pts[si]
+                x1, y1 = sorted_pts[si + 1]
+                sx1, sy1 = self._to_pixel(x1, y1)
+                bd = self._bends[si] if si < len(self._bends) else 0.0
+                if abs(bd) < 0.005:
+                    curve_path.lineTo(sx1, sy1)
+                else:
+                    cx = (x0 + x1) / 2
+                    cy = (y0 + y1) / 2 + bd
+                    cpx, cpy = self._to_pixel(cx, cy)
+                    curve_path.quadTo(cpx, cpy, sx1, sy1)
             p.setBrush(Qt.BrushStyle.NoBrush)
             p.setPen(QPen(QColor("#7c3aed"), 2.5))
             p.drawPath(curve_path)
 
+        # ── Control points ──
         for i, (x, y) in enumerate(sorted_pts):
             px2, py2 = self._to_pixel(x, y)
-            is_hover = (i == self._hover_idx) or (i == self._dragging_idx)
-            sz = 8 if is_hover else 6
-            color = QColor("#e94560") if is_hover else QColor("#7c3aed")
-            p.setPen(QPen(QColor("white"), 1.5))
+            is_hover = (i == self._hover_idx) or (
+                self._drag and self._drag[0] == 'pt'
+                and self._drag[1] < len(self._points)
+                and i == self._sorted_pos(self._drag[1]))
+            is_endpoint = (i == 0 or i == len(sorted_pts) - 1)
+            if is_endpoint:
+                sz = 5 if is_hover else 4
+                color = QColor("#b8a9e8") if is_hover else QColor("#8b7dc8")
+                p.setPen(QPen(QColor("#d4d0e8"), 1.2))
+            else:
+                sz = 8 if is_hover else 6
+                color = QColor("#e94560") if is_hover else QColor("#7c3aed")
+                p.setPen(QPen(QColor("white"), 1.5))
             p.setBrush(QBrush(color))
             p.drawEllipse(QPointF(px2, py2), sz, sz)
+
+        # ── Mode hint ──
+        fnt = p.font()
+        fnt.setPixelSize(8)
+        fnt.setBold(False)
+        p.setFont(fnt)
+        hc = QColor(C['text_dim'])
+        hc.setAlpha(140)
+        p.setPen(hc)
+        if self._mode == self.MODE_POINTS:
+            hint = "Clic = ajouter  |  Glisser = déplacer  |  Clic droit = supprimer"
+        else:
+            hint = "Glissez un segment pour ajuster la courbure"
+        p.drawText(QRectF(l, h - 12, dw, 12), Qt.AlignmentFlag.AlignCenter, hint)
+
         p.end()
 
 
@@ -892,12 +1335,15 @@ class _AutoEditor(QWidget):
 
         self._rebuild_curves()
 
-        # Load curve points
+        # Load curve points and bends
         for ap in auto_params:
             key = ap.get("key")
             if ap.get("mode") == "automated" and key in self._curve_editors:
                 pts = ap.get("curve_points", [(0,0),(1,1)])
+                bends = ap.get("curve_bends")
                 self._curve_editors[key].set_points(pts)
+                if bends:
+                    self._curve_editors[key].set_bends(bends)
 
     def new_automation(self):
         self._editing_uid = None
@@ -928,6 +1374,7 @@ class _AutoEditor(QWidget):
                 entry["target_val"] = row.get_target()
                 ce = self._curve_editors.get(row.pkey)
                 entry["curve_points"] = ce.get_points() if ce else [(0,0),(1,1)]
+                entry["curve_bends"] = ce.get_bends() if ce else [0.0]
             auto_params.append(entry)
 
         if not auto_params:
@@ -960,6 +1407,7 @@ class _AutoEditor(QWidget):
                 entry["target_val"] = row.get_target()
                 ce = self._curve_editors.get(row.pkey)
                 entry["curve_points"] = ce.get_points() if ce else [(0,0),(1,1)]
+                entry["curve_bends"] = ce.get_bends() if ce else [0.0]
             auto_params.append(entry)
         return {"effect_id": eid, "auto_params": auto_params}
 

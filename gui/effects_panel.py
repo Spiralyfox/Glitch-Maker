@@ -441,6 +441,8 @@ class EffectsPanel(QWidget):
             f"QPushButton {{ background: {COLORS['bg_dark']}; color: {COLORS['text_dim']}; "
             f"border: 1px solid {COLORS['border']}; border-radius: 3px; "
             f"font-size: 9px; font-weight: bold; }}"
+            f"QPushButton:hover {{ background: {COLORS['bg_light']}; color: {COLORS['text']}; "
+            f"border-color: {COLORS['accent']}; }}"
             f"QPushButton:checked {{ background: {COLORS['accent']}; color: white; border: none; }}"
         )
         return b

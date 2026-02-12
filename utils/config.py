@@ -2,7 +2,7 @@
 import os, sys, json, shutil
 
 APP_NAME = "Glitch Maker"
-APP_VERSION = "7.1"
+APP_VERSION = "7.2"
 WINDOW_MIN_WIDTH = 1050
 WINDOW_MIN_HEIGHT = 650
 RECORDING_SAMPLE_RATE = 44100
@@ -89,18 +89,44 @@ def get_colors() -> dict:
     return COLORS
 
 def checkbox_css(C=None) -> str:
-    """Return a QCheckBox stylesheet with dark unchecked / accent checked indicators."""
+    """Return a premium QCheckBox stylesheet matching the app's dark theme."""
     if C is None:
         C = COLORS
+    # Resolve path to checkmark SVG (works both dev & frozen)
+    _assets = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "assets")
+    _check_path = os.path.join(_assets, "check.svg").replace("\\", "/")
     return (
-        f"QCheckBox {{ color: {C['text']}; font-size: 11px; spacing: 6px; }}"
-        f" QCheckBox::indicator {{ width: 16px; height: 16px; border-radius: 3px;"
-        f"   border: 1px solid {C['border']}; background: {C['bg_dark']}; }}"
-        f" QCheckBox::indicator:hover {{ border-color: {C['accent']}; }}"
-        f" QCheckBox::indicator:checked {{ background: {C['accent']};"
-        f"   border-color: {C['accent']}; }}"
-        f" QCheckBox::indicator:checked:hover {{ background: {C['accent_hover']};"
-        f"   border-color: {C['accent_hover']}; }}"
+        # ── label text ──
+        f"QCheckBox {{ color: {C['text']}; font-size: 11px; spacing: 8px; }}"
+        # ── indicator box (unchecked) ──
+        f" QCheckBox::indicator {{"
+        f"   width: 18px; height: 18px; border-radius: 5px;"
+        f"   border: 2px solid {C['border']};"
+        f"   background: {C['bg_dark']};"
+        f" }}"
+        # ── hover (unchecked) ──
+        f" QCheckBox::indicator:hover {{"
+        f"   border-color: {C['accent']};"
+        f"   background: {C['bg_light']};"
+        f" }}"
+        # ── checked ──
+        f" QCheckBox::indicator:checked {{"
+        f"   background: qlineargradient(x1:0, y1:0, x2:1, y2:1,"
+        f"     stop:0 {C['accent']}, stop:1 {C['accent_secondary']});"
+        f"   border-color: {C['accent']};"
+        f"   image: url({_check_path});"
+        f" }}"
+        # ── checked + hover ──
+        f" QCheckBox::indicator:checked:hover {{"
+        f"   background: qlineargradient(x1:0, y1:0, x2:1, y2:1,"
+        f"     stop:0 {C['accent_hover']}, stop:1 {C['accent']});"
+        f"   border-color: {C['accent_hover']};"
+        f" }}"
+        # ── disabled ──
+        f" QCheckBox::indicator:disabled {{"
+        f"   border-color: {C['bg_light']}; background: {C['bg_medium']}; opacity: 0.5;"
+        f" }}"
+        f" QCheckBox:disabled {{ color: {C['text_dim']}; }}"
     )
 
 # ═══════════════════════════════════════════════════
