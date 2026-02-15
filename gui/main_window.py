@@ -486,6 +486,7 @@ class MainWindow(QMainWindow):
             ("spectrum",        t("view.spectrum"),      False),
             ("effect_history",  t("view.history"),       True),
             ("automation",      "Automations",           False),
+            ("freq_scale",      "Frequency Scale",       True),
         ]
         for key, label, default_on in panels:
             act = QAction(label, self)
@@ -787,25 +788,31 @@ class MainWindow(QMainWindow):
                 self.transport.set_playing(True)
                 return
             if s is not None:
+                _log.info("Play selection: %d to %d", s, e)
                 self.playback.play_selection(s, e)
             else:
                 # Start from anchor (blue bar) if set
                 anchor = self.waveform._anchor
                 if anchor is not None:
+                    _log.info("Play from anchor: %d", anchor)
                     self.playback.play(start_pos=anchor)
                 else:
+                    _log.info("Play from start")
                     self.playback.play()
             self.transport.set_playing(True)
         except Exception as ex:
             _log.error("Play error: %s", ex)
 
     def _pause(self):
+        _log.info("Playback paused")
         self.playback.pause()
         self.transport.set_playing(False)
 
     def _stop(self):
         try:
             was_playing = self.playback.is_playing
+            # if was_playing:
+            #     _log.info("Playback stopped")
             self.playback.stop()
             if was_playing:
                 # Return to anchor (blue bar) or selection start, or 0
@@ -875,7 +882,6 @@ class MainWindow(QMainWindow):
             s_samp = max(0, min(int(s), total))
             e_samp = max(s_samp, min(int(e), total))
             if e_samp - s_samp < 64:
-                self.transport.set_selection_info("")
                 # If was playing, resume from click position
                 if getattr(self, '_was_playing_before_drag', False):
                     self._was_playing_before_drag = False
@@ -884,7 +890,6 @@ class MainWindow(QMainWindow):
                 return
             self.waveform.set_selection(s_samp, e_samp)
             dur_s = (e_samp - s_samp) / self.sample_rate
-            self.transport.set_selection_info(f"Sel : {format_time(dur_s)}")
             fav = getattr(self.effects_panel, 'favorites', [])
             if fav:
                 names = []
@@ -945,7 +950,6 @@ class MainWindow(QMainWindow):
 
     def _deselect(self):
         self.waveform.clear_selection()
-        self.transport.set_selection_info("")
         self.toolbar_info.setText("")
         for c in self.timeline.clips:
             c._selected = False
@@ -973,6 +977,7 @@ class MainWindow(QMainWindow):
         """Reset everything to a blank state."""
         if not self._check_unsaved():
             return
+        _log.info("Creating new project (resetting state)")
         self._stop()
         self.audio_data = None
         self._base_audio = None
@@ -1007,7 +1012,6 @@ class MainWindow(QMainWindow):
         self._tl_scrollbar.setVisible(False)
         # Reset transport
         self.transport.set_time("00:00.00", "00:00.00")
-        self.transport.set_selection_info("")
         self.transport.set_playing(False)
         # Reset spectrum
         if hasattr(self, 'spectrum'):
@@ -1034,6 +1038,7 @@ class MainWindow(QMainWindow):
 
     def _load_audio(self, fp):
         try:
+            _log.info("Loading initial audio: %s", fp)
             self._stop()
             data, sr = load_audio(fp)
             st = ensure_stereo(data)
@@ -1055,7 +1060,6 @@ class MainWindow(QMainWindow):
             self.waveform.selection_start = None
             self.waveform.selection_end = None
             self.waveform._anchor = None
-            self.transport.set_selection_info("")
             self._refresh_all()
             self._sync_history_chain()
             self._unsaved = False
@@ -1073,6 +1077,7 @@ class MainWindow(QMainWindow):
         if not fp:
             return
         try:
+            _log.info("Adding audio clip: %s", fp)
             data, sr = load_audio(fp)
             st = ensure_stereo(data)
             name = os.path.splitext(os.path.basename(fp))[0]
@@ -1100,7 +1105,7 @@ class MainWindow(QMainWindow):
                                     replay_data={"audio": st.copy(), "name": name, "color": color})
             self._refresh_all()
             self._unsaved = True
-            self.statusBar().showMessage(f"Added: {os.path.basename(fp)}")
+            self.statusBar().showMessage(f"Added : {os.path.basename(fp)}")
         except Exception as e:
             _log.error("Add audio error: %s", e, exc_info=True)
             QMessageBox.critical(self, APP_NAME, str(e))
@@ -1152,6 +1157,7 @@ class MainWindow(QMainWindow):
 
     def _do_save(self, fp):
         try:
+            _log.info("Action: Save project to %s", fp)
             save_project(
                 fp, self.timeline, self.sample_rate, self.current_filepath,
                 base_audio=self._base_audio,
@@ -1173,6 +1179,7 @@ class MainWindow(QMainWindow):
         fp, _ = QFileDialog.getSaveFileName(self, "Export", f"export.{fmt}", fmap.get(fmt, ""))
         if fp:
             try:
+                _log.info("Action: Export %s to %s", fmt, fp)
                 export_audio(self.audio_data, self.sample_rate, fp, fmt)
                 self.statusBar().showMessage(t("status.exported").format(f=fp))
             except Exception as e:
@@ -1191,7 +1198,6 @@ class MainWindow(QMainWindow):
             self.transport.set_time(
                 "00:00.00",
                 format_time(get_duration(self.audio_data, self.sample_rate)))
-        self.transport.set_selection_info("")
 
     def _rebuild_audio(self):
         rendered, sr = self.timeline.render()
@@ -1207,7 +1213,7 @@ class MainWindow(QMainWindow):
                 self.waveform.set_clip_highlight(c.position, c.end_position)
                 self.waveform.set_selection(c.position, c.end_position)
                 dur = format_time(c.duration_seconds)
-                self.transport.set_selection_info(f"Sel : {dur}")
+                self.statusBar().showMessage(t("status.clip_selected").format(n=c.name, d=dur))
                 self.playback.seek(c.position)
                 self.waveform.set_playhead(c.position)
                 self.timeline_w.set_playhead(c.position, self.sample_rate)
@@ -1309,7 +1315,7 @@ class MainWindow(QMainWindow):
         if not op.get("enabled", True) or self.audio_data is None:
             return
         if op.get("type") == "automation":
-            self._render_auto_op(op)
+            self._render_auto_op()
             self._update_clips_from_audio()
             self._refresh_all()
             return
@@ -1515,12 +1521,14 @@ class MainWindow(QMainWindow):
             return
         op = self._effect_ops[idx]
         name = op.get("name", "?")
+        _log.info("Action: Delete operation '%s' [%s]", name, uid)
         reply = QMessageBox.question(
             self, APP_NAME,
             t("history.delete_confirm").format(name=name),
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No)
         if reply != QMessageBox.StandardButton.Yes:
+            _log.info("Deletion cancelled by user")
             return
         self._push_undo(f"Delete : {name}")
         self._effect_ops.pop(idx)
@@ -1534,8 +1542,10 @@ class MainWindow(QMainWindow):
         Works for all types including structural ops."""
         op = next((o for o in self._effect_ops if o.get("uid") == uid), None)
         if op is None: return
-        self._push_undo(f"Toggle : {op['name']}")
         op["enabled"] = not op.get("enabled", True)
+        state = "ON" if op["enabled"] else "OFF"
+        _log.info("Action: Toggle operation '%s' [%s] -> %s", op['name'], uid, state)
+        self._push_undo(f"Toggle : {op['name']}")
         self._render_from_ops()
         self._sync_history_chain()
         self._unsaved = True
@@ -1595,8 +1605,10 @@ class MainWindow(QMainWindow):
             new_params = d.get_params()
             # Check if params actually changed
             if new_params == op.get("params", {}):
+                _log.info("Edit operation '%s': No changes detected", op['name'])
                 return
 
+            _log.info("Action: Edit operation '%s' [%s] with new params", op['name'], uid)
             # Apply changes
             self._push_undo(f"Edit: {op['name']}")
             op["params"] = dict(new_params)
@@ -1902,14 +1914,14 @@ class MainWindow(QMainWindow):
         clip = clips[idx]
         if local_pos <= 0 or local_pos >= clip.duration_samples:
             return False
-        d1 = clip.audio_data[:local_pos]
-        d2 = clip.audio_data[local_pos:]
+        d1 = clip.audio_data[:local]
+        d2 = clip.audio_data[local:]
         c1 = AudioClip(name=f"{clip.name}_L", audio_data=d1,
                         sample_rate=self.sample_rate, position=clip.position,
                         color=_generate_distinct_color(self.timeline._color_counter))
         self.timeline._color_counter += 1
         c2 = AudioClip(name=f"{clip.name}_R", audio_data=d2,
-                        sample_rate=self.sample_rate, position=clip.position + local_pos,
+                        sample_rate=self.sample_rate, position=clip.position + local,
                         color=_generate_distinct_color(self.timeline._color_counter))
         self.timeline._color_counter += 1
         clips[idx:idx+1] = [c1, c2]
@@ -2319,22 +2331,20 @@ class MainWindow(QMainWindow):
                 act.setChecked(True)
                 act.blockSignals(False)
 
-    def _toggle_panel(self, key, visible):
-        panel_map = {
-            "spectrum":       [self.spectrum],
-            "effect_history": [self.effect_history],
-        }
-        if key == "automation":
-            if visible:
+    def _toggle_panel(self, key, checked):
+        if key == "spectrum":
+            self.spectrum.setVisible(checked)
+        elif key == "effect_history":
+            self.effect_history.setVisible(checked)
+        elif key == "automation":
+            if checked:
                 self._auto_win.show()
                 self._auto_win.raise_()
                 self._sync_auto_audio()
             else:
                 self._auto_win.hide()
-            return
-        widgets = panel_map.get(key, [])
-        for w in widgets:
-            w.setVisible(visible)
+        elif key == "freq_scale":
+            self.waveform.set_show_freq_scale(checked)
 
     # ══════ Timeline ops ══════
 
@@ -2704,31 +2714,28 @@ class MainWindow(QMainWindow):
 
     def _do_undo(self):
         if not self._ops_undo: return
-        # Save current state to redo
-        current = {
-            "desc": "",
-            "ops": self._copy_ops(self._effect_ops),
-            "base_audio": self._base_audio.copy() if self._base_audio is not None else None,
-            "clips": [(c.name, c.audio_data.copy(), c.position, c.color)
-                      for c in self.timeline.clips] if self.timeline.clips else [],
-        }
-        self._ops_redo.append(current)
-        # Restore from undo
-        snapshot = self._ops_undo.pop()
-        self._restore_snapshot(snapshot)
-        self.statusBar().showMessage(t("status.undo"))
-        self._update_undo_labels()
+        try:
+            # Save current state to redo
+            current = {
+                "desc": self._ops_undo[-1].get("desc", ""), # Description of the state we are undoing TO
+                "ops": self._copy_ops(self._effect_ops),
+                "base_audio": self._base_audio.copy() if self._base_audio is not None else None,
+                "clips": [(c.name, c.audio_data.copy(), c.position, c.color)
+                          for c in self.timeline.clips] if self.timeline.clips else [],
+            }
+            self._ops_redo.append(current)
+
+            # Restore from undo
+            snapshot = self._ops_undo.pop()
+            _log.info("Action: Undo '%s'", snapshot.get("desc", ""))
+            self._restore_snapshot(snapshot)
+            self.statusBar().showMessage(t("status.undo"))
+            self._update_undo_labels()
+        except Exception as e:
+            _log.error("Error during undo: %s", e)
 
     def _do_redo(self):
         if not self._ops_redo: return
-        current = {
-            "desc": "",
-            "ops": self._copy_ops(self._effect_ops),
-            "base_audio": self._base_audio.copy() if self._base_audio is not None else None,
-            "clips": [(c.name, c.audio_data.copy(), c.position, c.color)
-                      for c in self.timeline.clips] if self.timeline.clips else [],
-        }
-        self._ops_undo.append(current)
         snapshot = self._ops_redo.pop()
         self._restore_snapshot(snapshot)
         self.statusBar().showMessage(t("status.redo"))
@@ -2881,7 +2888,7 @@ class MainWindow(QMainWindow):
         if self.audio_data is not None:
             self.waveform.set_selection(0, len(self.audio_data))
             dur = format_time(get_duration(self.audio_data, self.sample_rate))
-            self.transport.set_selection_info(f"Sel : {dur}")
+            # self.transport.set_selection_info(f"Sel : {dur}")
 
     def _open_manual(self):
         import webbrowser

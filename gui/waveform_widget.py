@@ -46,6 +46,9 @@ class WaveformWidget(QWidget):
         self._zoom: float = 1.0
         self._offset: float = 0.0
         self._max_zoom: float = 100.0
+        
+        # Vertical Zoom
+        self._v_zoom: float = 1.0
 
         # Beat grid
         self._grid_enabled = False
@@ -60,6 +63,8 @@ class WaveformWidget(QWidget):
                                 "#ff85a1", "#48bfe3", "#e07c24", "#b5179e"]
         self._marker_idx = 0
         self._right_click_sample = None
+        self._show_freq_scale = True
+        self._scale_w = 40
 
         # Precompute colors
         self._wave_rgb = _parse_color(COLORS['accent'])
@@ -67,6 +72,13 @@ class WaveformWidget(QWidget):
         self._border_rgb = _parse_color(COLORS['border'])
         self.setMinimumHeight(120)
         self.setCursor(Qt.CursorShape.CrossCursor)
+
+    def set_show_freq_scale(self, show: bool):
+        """Affiche ou cache l'échelle de fréquence (0 Hz -> SR/2)."""
+        if self._show_freq_scale != show:
+            self._show_freq_scale = show
+            self._cache = None
+            self.update()
 
     def set_grid(self, enabled, bpm=120.0, beats=4, subdiv=1, offset_ms=0.0):
         """Configure la grille de temps (activer, BPM, beats, subdivisions)."""
@@ -150,6 +162,7 @@ class WaveformWidget(QWidget):
         """Reset zoom to full view."""
         self._zoom = 1.0
         self._offset = 0.0
+        self._v_zoom = 1.0
         self._cache = None
         self.update()
         self.zoom_changed.emit(self._zoom, self._offset)
@@ -211,22 +224,26 @@ class WaveformWidget(QWidget):
         return int(start_frac * n), int(end_frac * n)
 
     def _pos_to_sample(self, x):
-        """Convert widget x to sample index (accounting for zoom)."""
+        """Convert widget x to sample index (accounting for zoom and scale margin)."""
         if self.audio_data is None:
             return 0
+        margin = self._scale_w if self._show_freq_scale else 0
+        w_eff = max(1, self.width() - margin)
         n = len(self.audio_data)
         vs, ve = self._visible_range()
         visible_len = max(ve - vs, 1)
-        frac = max(0.0, min(x / self.width(), 1.0))
+        frac = max(0.0, min((x - margin) / w_eff, 1.0))
         return int(vs + frac * visible_len)
 
     def _sample_to_x(self, s):
-        """Convert sample index to widget x (accounting for zoom)."""
+        """Convert sample index to widget x (accounting for zoom and scale margin)."""
         if self.audio_data is None or len(self.audio_data) == 0:
             return 0
+        margin = self._scale_w if self._show_freq_scale else 0
+        w_eff = max(1, self.width() - margin)
         vs, ve = self._visible_range()
         visible_len = max(ve - vs, 1)
-        return int((s - vs) / visible_len * self.width())
+        return margin + int((s - vs) / visible_len * w_eff)
 
     # ── Mouse events ──
 
@@ -345,6 +362,15 @@ class WaveformWidget(QWidget):
         if delta == 0:
             return
 
+        # Check if mouse is over Frequency Scale -> Vertical Zoom
+        if self._show_freq_scale and e.position().x() < self._scale_w:
+            factor = 1.1 if delta > 0 else 1.0 / 1.1
+            self._v_zoom = max(1.0, min(self._v_zoom * factor, 100.0))
+            self._cache = None
+            self.update()
+            return
+
+        # Horizontal Zoom
         # Cursor position as fraction of visible range
         cursor_x_frac = e.position().x() / max(self.width(), 1)
 
@@ -385,14 +411,22 @@ class WaveformWidget(QWidget):
                 return
 
             # Cache waveform image
-            if (self._cache is None or self._cache_w != w or self._cache_h != h
-                    or self._cache_zoom != self._zoom or self._cache_offset != self._offset):
-                self._cache = self._render_wave(w, h)
-                self._cache_w = w
+            margin = self._scale_w if self._show_freq_scale else 0
+            
+            # Clip drawing to waveform area (exclude scale)
+            p.setClipRect(margin, 0, w - margin, h)
+
+            w_wave = w - margin
+            if (self._cache is None or self._cache_w != w_wave or self._cache_h != h
+                    or self._cache_zoom != self._zoom or self._cache_offset != self._offset
+                    or getattr(self, '_cache_v_zoom', 1.0) != self._v_zoom):
+                self._cache = self._render_wave(w_wave, h)
+                self._cache_w = w_wave
                 self._cache_h = h
                 self._cache_zoom = self._zoom
                 self._cache_offset = self._offset
-            p.drawImage(0, 0, self._cache)
+                self._cache_v_zoom = self._v_zoom
+            p.drawImage(margin, 0, self._cache)
 
             # ── Beat grid ──
             if self._grid_enabled and self.audio_data is not None and self._grid_bpm > 0:
@@ -504,58 +538,253 @@ class WaveformWidget(QWidget):
                 p.setFont(QFont("Consolas", 8))
                 p.drawText(w - 60, h - 4, f"x{self._zoom:.1f}")
 
+            # Disable clipping for scale
+            p.setClipping(False)
+
+            # ── Frequency Scale (-SR/2 -> +SR/2) ──
+            if self._show_freq_scale:
+                p.setPen(QPen(QColor(COLORS['border']), 1))
+                p.drawLine(margin - 1, 0, margin - 1, h)
+                p.setFont(QFont("Consolas", 7))
+                
+                sr_half = self.sample_rate / 2
+                
+                # Apply vertical zoom to range
+                visible_sr_half = sr_half / self._v_zoom
+                
+                # Draw 0 Hz
+                y0 = int(h / 2)
+                p.setPen(QColor(COLORS['text_dim']))
+                p.drawLine(margin - 5, y0, margin - 1, y0)
+                p.drawText(2, y0 + 3, "0 Hz")
+
+                # Adaptive Step
+                # Aim for ~8-10 ticks
+                rough_step = visible_sr_half / 8
+                import math
+                if rough_step > 0:
+                    mag = 10 ** math.floor(math.log10(rough_step))
+                    base = rough_step / mag
+                    if base < 2: step = 1 * mag
+                    elif base < 5: step = 2 * mag
+                    else: step = 5 * mag
+                    step_hz = max(1, int(step))
+                else:
+                    step_hz = 1000
+
+                # Go up from 0
+                f = step_hz
+                while f < visible_sr_half:
+                    ratio = f / visible_sr_half
+                    y_up = int((h / 2) * (1 - ratio))
+                    y_down = int((h / 2) * (1 + ratio))
+                    
+                    # Label context
+                    if f >= 1000:
+                        txt = f"{f/1000:.0f}k" if f % 1000 == 0 else f"{f/1000:.1f}k"
+                    else:
+                        txt = str(f)
+                    
+                    # Draw Up (+f)
+                    if y_up > 10:
+                        p.drawLine(margin - 5, y_up, margin - 1, y_up)
+                        p.drawText(2, y_up + 3, txt)
+                        
+                    # Draw Down (-f)
+                    if y_down < h - 10:
+                        p.drawLine(margin - 5, y_down, margin - 1, y_down)
+                        p.drawText(2, y_down + 3, f"-{txt}")
+                        
+                    f += step_hz
+
         except Exception as ex:
             _log.warning("Waveform paintEvent: %s", ex)
         finally:
             p.end()
 
+    def _calc_display_data(self, w):
+        """
+        Calculate min/max arrays (or raw mono) for the current visible range.
+        Returns: (mode, data)
+          mode='high': data is mono array (for polyline)
+          mode='low': data is (mins, maxs) arrays (for envelope)
+          mode='empty': data is None
+        """
+        if self.audio_data is None or len(self.audio_data) == 0:
+            return 'empty', None
+
+        vs, ve = self._visible_range()
+        visible = self.audio_data[vs:ve]
+        if len(visible) == 0:
+            return 'empty', None
+
+        # Convert to mono
+        mono = np.mean(visible, axis=1) if visible.ndim > 1 else visible
+        n = len(mono)
+
+        # High Zoom (few samples) -> Return raw
+        if n < w:
+            return 'high', mono
+            
+        # Low Zoom -> Downsample
+        step = max(1, n // w)
+        cols = min(w, n // step if step > 0 else w)
+        if cols <= 0:
+            return 'empty', None
+
+        usable = cols * step
+        reshaped = mono[:usable].reshape(cols, step)
+        mins = np.min(reshaped, axis=1)
+        maxs = np.max(reshaped, axis=1)
+        
+        return 'low', (mins, maxs)
+
     def _render_wave(self, w, h):
-        """Render waveform of the visible range using numpy pixel buffer."""
+        """Render waveform using cached display data if available."""
+        # Standard background
         buf = np.zeros((h, w, 4), dtype=np.uint8)
         br, bg, bb = self._bg_rgb
         buf[:, :, 0] = bb
         buf[:, :, 1] = bg
         buf[:, :, 2] = br
         buf[:, :, 3] = 255
-
-        if self.audio_data is None or len(self.audio_data) == 0:
-            img = QImage(buf.data, w, h, w * 4, QImage.Format.Format_ARGB32)
-            return img.copy()
-
-        # Extract visible portion
-        vs, ve = self._visible_range()
-        visible = self.audio_data[vs:ve]
-        if len(visible) == 0:
-            img = QImage(buf.data, w, h, w * 4, QImage.Format.Format_ARGB32)
-            return img.copy()
-
-        mono = np.mean(visible, axis=1) if visible.ndim > 1 else visible
-        n = len(mono)
+        
+        # Center line
         mid = h // 2
+        bb2, bg2, br2 = self._border_rgb[2], self._border_rgb[1], self._border_rgb[0]
+        buf[mid, ::2, 0] = bb2 # Blue
+        buf[mid, ::2, 1] = bg2 # Green
+        buf[mid, ::2, 2] = br2 # Red
 
-        step = max(1, n // w)
-        cols = min(w, n // step if step > 0 else w)
-        if cols <= 0:
-            img = QImage(buf.data, w, h, w * 4, QImage.Format.Format_ARGB32)
-            return img.copy()
+        # Check if we need to recompute data
+        # Data depends on: audio_data, visible_range (zoom, offset), width. 
+        # NOT on h or v_zoom.
+        
+        current_data_key = (self._zoom, self._offset, w, id(self.audio_data))
+        
+        if getattr(self, '_data_cache_key', None) != current_data_key:
+            self._data_mode, self._data_val = self._calc_display_data(w)
+            self._data_cache_key = current_data_key
+            
+        if self._data_mode == 'empty':
+            return QImage(buf.data, w, h, w * 4, QImage.Format.Format_ARGB32).copy()
 
-        usable = cols * step
-        reshaped = mono[:usable].reshape(cols, step)
-        mins = np.min(reshaped, axis=1)
-        maxs = np.max(reshaped, axis=1)
+        img = QImage(buf.data, w, h, w * 4, QImage.Format.Format_ARGB32).copy()
+        p = QPainter(img)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        color = QColor(*self._wave_rgb)
+        p.setPen(QPen(color, 1))
 
-        y_top = np.clip((mid - maxs * mid * 0.9).astype(np.int32), 0, h - 1)
-        y_bot = np.clip((mid - mins * mid * 0.9).astype(np.int32), 0, h - 1)
-        yt = np.minimum(y_top, y_bot)
-        yb = np.maximum(y_top, y_bot)
+        if self._data_mode == 'high':
+            # Draw Polyline from mono data
+            mono = self._data_val
+            # Apply Vertical Zoom
+            if self._v_zoom > 1.0:
+                mono = mono * self._v_zoom
+                
+            n = len(mono)
+            xs = np.linspace(0, w, n)
+            ys = mid - mono * mid * 0.9
+            
+            points = [QPointF(x, y) for x, y in zip(xs, ys)]
+            p.drawPolyline(points)
+            p.end()
+            return img
+            
+        elif self._data_mode == 'low':
+            mins, maxs = self._data_val
+            
+            # Apply Vertical Zoom locally
+            if self._v_zoom > 1.0:
+                mins = mins * self._v_zoom
+                maxs = maxs * self._v_zoom
+            
+            # Map to screen Y
+            y_top = np.clip((mid - maxs * mid * 0.9).astype(np.int32), 0, h - 1)
+            y_bot = np.clip((mid - mins * mid * 0.9).astype(np.int32), 0, h - 1)
+            yt = np.minimum(y_top, y_bot)
+            yb = np.maximum(y_top, y_bot)
 
-        # Vectorized fill
-        wr, wg, wb = self._wave_rgb
-        rows = np.arange(h, dtype=np.int32).reshape(h, 1)
-        mask = (rows >= yt[np.newaxis, :cols]) & (rows <= yb[np.newaxis, :cols])
-        buf[:, :cols, 0] = np.where(mask, wb, buf[:, :cols, 0])
-        buf[:, :cols, 1] = np.where(mask, wg, buf[:, :cols, 1])
-        buf[:, :cols, 2] = np.where(mask, wr, buf[:, :cols, 2])
+            # Determine LOD Strategy
+            # self.audio_data length vs width?
+            # actually we can infer 'step' from earlier or recalculate.
+            # step = max(1, n // w). But we don't have n here easily without peeking cache logic.
+            # However, we know len(mins) == cols.
+            # And cols <= w.
+            # The density 'step' was calculated in _calc_display_data.
+            # We should probably return 'step' from _calc_display_data or re-estimate it here?
+            # We can pass 'step' in 'low' tuple.
+            
+            # Or simpler: we can just check if we are truly zoomed out?
+            # Actually, the user's issue is likely simpler:
+            # If we have a cached mins/maxs, it is ALREADY downsampled to ~w pixels.
+            # So drawing it via QPainter shouldn't be that slow (only ~w points).
+            # UNLESS w is very large (4k screen?).
+            
+            # BUT, the user specifically mentioned "trop de traits".
+            # Let's trust the user and use Hybrid approach.
+            
+            # We need the 'step' to decide.
+            # Let's retrieve step from cache tuple? Or modify _calc_display_data.
+            # Alternatively, re-calculate n?
+            # visible_len = ve - vs.
+            # step = visible_len // w.
+            
+            vs, ve = self._visible_range()
+            visible_len = ve - vs
+            step = max(1, visible_len // w)
+            
+            # LOD Threshold:
+            # If step > 4 (compressed > 4 samples per pixel), use Numpy Buffer (Fast).
+            # If step <= 4 (getting closer to 1:1), use QPainter (Smooth).
+            
+            if step > 4:
+                 # ── Fast Mode (Numpy Buffer) ──
+                p.end() # Don't use QPainter for this part
+                
+                cols = len(mins)
+                rows = np.arange(h, dtype=np.int32).reshape(h, 1)
+                mask = (rows >= yt[np.newaxis, :]) & (rows <= yb[np.newaxis, :])
+                
+                # Colors
+                wr, wg, wb = self._wave_rgb
+                
+                # Slice interest region
+                roi = buf[:, :cols]
+                roi[mask, 0] = wb
+                roi[mask, 1] = wg
+                roi[mask, 2] = wr
+                
+                return QImage(buf.data, w, h, w * 4, QImage.Format.Format_ARGB32).copy()
+            
+            else:
+                 # ── Smooth Mode (QPainter) ──
+                cols = len(mins)
+                # We need floats for QPainter
+                # Re-map floats from raw values (or ints if we want pixel perfect?)
+                # We used floats int previously for smoothness.
+                
+                y_max_f = mid - maxs * mid * 0.9
+                y_min_f = mid - mins * mid * 0.9
+                
+                xs = np.arange(cols, dtype=np.float64)
+                
+                points_top = [QPointF(x, y) for x, y in zip(xs, y_max_f)]
+                points_bot = [QPointF(x, y) for x, y in zip(xs, y_min_f)]
+                
+                # Draw filled envelope
+                poly = QPolygonF(points_top + points_bot[::-1])
+                p.setBrush(QBrush(color))
+                p.setPen(Qt.PenStyle.NoPen)
+                p.drawPolygon(poly)
+                
+                # Draw outlines
+                p.setPen(QPen(color, 1))
+                p.drawPolyline(QPolygonF(points_top))
+                p.drawPolyline(QPolygonF(points_bot))
+
+        p.end()
+        return img
 
         # Center line (dotted)
         bb2, bg2, br2 = self._border_rgb[2], self._border_rgb[1], self._border_rgb[0]

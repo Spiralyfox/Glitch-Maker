@@ -1714,11 +1714,12 @@ class AutomationWindow(QDialog):
         self._stack_editor.show()
 
     def _start_new(self):
-        if self._sel_start is None or self._sel_end is None:
-            return
+        s, e = self._wave.selection_start, self._wave.selection_end
+        if s is None: return
+        _log.info("Action: New automation started for region %d-%d", s, e)
         self._editor.new_automation()
-        self._push_region_audio()
-        self._show_editor()
+        self._editor.set_region_audio(self._wave.get_region_audio(), self._wave._sr)
+        self._set_view(1)
 
     def _start_edit(self, uid):
         op = next((a for a in self._automations if a.get("uid") == uid), None)
@@ -1787,8 +1788,10 @@ class AutomationWindow(QDialog):
         op["start"] = self._sel_start
         op["end"] = self._sel_end
         if op.get("uid") is None:
+            _log.info("Action: Automation created: %s", op.get('name', 'unnamed'))
             self.automation_added.emit(op)
         else:
+            _log.info("Action: Automation edited: %s [%s]", op.get('name', 'unnamed'), op['uid'])
             self.automation_edited.emit(op)
         self._show_list()
 

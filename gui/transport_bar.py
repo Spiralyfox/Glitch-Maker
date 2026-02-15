@@ -22,8 +22,6 @@ class TransportBar(QWidget):
         self.lbl_time = QLabel("00:00.00 / 00:00.00")
         self.lbl_time.setStyleSheet(f"color: {COLORS['text']}; font-family: Consolas, monospace; font-size: 12px;")
         self.lbl_time.setFixedWidth(160); lo.addWidget(self.lbl_time); lo.addStretch()
-        self.lbl_sel = QLabel(""); self.lbl_sel.setStyleSheet(f"color: {COLORS['accent']}; font-size: 10px;")
-        lo.addWidget(self.lbl_sel); lo.addStretch()
         vol_lbl = QLabel("Vol"); vol_lbl.setStyleSheet(f"color: {COLORS['text_dim']}; font-size: 11px;"); lo.addWidget(vol_lbl)
         self.vol_slider = QSlider(Qt.Orientation.Horizontal); self.vol_slider.setRange(0, 100); self.vol_slider.setValue(80)
         self.vol_slider.setFixedWidth(90)
@@ -57,5 +55,3 @@ class TransportBar(QWidget):
     def set_playing(self, p): self._playing = p; self.btn_play.setText("PAUSE" if p else "PLAY")
     """Met a jour l affichage du temps courant/total."""
     def set_time(self, c, t): self.lbl_time.setText(f"{c} / {t}")
-    """Affiche l info de selection dans la barre."""
-    def set_selection_info(self, t): self.lbl_sel.setText(t)

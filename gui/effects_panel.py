@@ -5,9 +5,11 @@ Features: favorites (★), right-click quick apply.
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QLineEdit, QScrollArea, QFrame, QToolTip, QGraphicsDropShadowEffect,
-    QMenu
+    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
+    QLineEdit, QScrollArea, QFrame, QToolTip, QGraphicsDropShadowEffect,
+    QMenu, QApplication
 )
-from PyQt6.QtCore import Qt, pyqtSignal, QPoint
+from PyQt6.QtCore import Qt, pyqtSignal, QPoint, QEvent
 from PyQt6.QtGui import QCursor, QColor, QFont, QPainter, QBrush, QPen
 
 from utils.translator import t
@@ -95,6 +97,7 @@ class EffectButton(QWidget):
 
     def mousePressEvent(self, e):
         """Clic gauche emet le signal clicked avec le nom du preset."""
+        self.setFocus()  # Step Id: 112: Ensure button takes focus (clearing search bar)
         if e.button() == Qt.MouseButton.LeftButton:
             self.clicked.emit()
 
@@ -242,6 +245,7 @@ class PresetItem(QWidget):
 
     def mousePressEvent(self, e):
         """Clic gauche emet le signal clicked avec le nom du preset."""
+        self.setFocus()  # Step Id: 112: Ensure item takes focus
         if e.button() == Qt.MouseButton.LeftButton:
             self.clicked.emit(self._name)
 
@@ -282,6 +286,7 @@ class EffectsPanel(QWidget):
     def __init__(self, parent=None):
         """Initialise le widget EffectsPanel."""
         super().__init__(parent)
+        self.setFocusPolicy(Qt.FocusPolicy.ClickFocus)  # Step Id: 59: Allow clicking panel to clear focus
         self.setFixedWidth(220)
         self._plugins = {}
         self._tag_presets = {}
@@ -337,6 +342,7 @@ class EffectsPanel(QWidget):
             f"QLineEdit:focus {{ border: 1px solid {COLORS['accent']}; }}"
         )
         self._search.textChanged.connect(self._on_search)
+        self._search.installEventFilter(self)  # Install filter on search bar
         lo.addWidget(self._search)
 
         # Separator below search (same style as header border)
@@ -477,6 +483,7 @@ class EffectsPanel(QWidget):
     def _rebuild(self):
         """Reconstruit la liste des effets apres changement de langue."""
         container = QWidget()
+        container.setFocusPolicy(Qt.FocusPolicy.ClickFocus)  # Step Id: 59: Allow clicking background to clear focus
         container.setStyleSheet(f"background: {COLORS['bg_panel']};")
         cl = QVBoxLayout(container)
         cl.setContentsMargins(4, 4, 4, 4)
@@ -595,3 +602,22 @@ class EffectsPanel(QWidget):
         s.setFixedHeight(1)
         s.setStyleSheet(f"background: {COLORS['border']}; border: none; margin: 2px 8px;")
         return s
+
+    def eventFilter(self, obj, event):
+        """Handle global clicks to clear search focus."""
+        if obj == self._search:
+            if event.type() == QEvent.Type.FocusIn:
+                # Start watching global clicks
+                QApplication.instance().installEventFilter(self)
+            elif event.type() == QEvent.Type.FocusOut:
+                # Stop watching global clicks
+                QApplication.instance().removeEventFilter(self)
+        elif event.type() == QEvent.Type.MouseButtonPress:
+            # Check if click is outside search bar
+            if self._search.hasFocus():
+                local_pos = self._search.mapFromGlobal(event.globalPosition().toPoint())
+                if not self._search.rect().contains(local_pos):
+                    # Clicked outside -> clear focus
+                    self._search.clearFocus()
+        
+        return super().eventFilter(obj, event)

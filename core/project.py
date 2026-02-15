@@ -6,11 +6,15 @@ import os, json, tempfile, zipfile, copy
 import numpy as np
 import soundfile as sf
 from core.timeline import Timeline, AudioClip
+from utils.logger import get_logger
+
+_log = get_logger("project")
 
 
 def save_project(filepath, timeline, sr, source_path="",
                  base_audio=None, effect_ops=None,
                  undo_stack=None, redo_stack=None):
+    _log.info("Saving project: %s", filepath)
     with zipfile.ZipFile(filepath, 'w', zipfile.ZIP_DEFLATED) as zf:
         meta = {
             "version": "7.0",
@@ -61,6 +65,7 @@ def save_project(filepath, timeline, sr, source_path="",
 
 
 def load_project(filepath):
+    _log.info("Loading project: %s", filepath)
     result = {"timeline": Timeline(), "sr": 44100, "source": "",
               "base_audio": None, "effect_ops": [], "undo_stack": [], "redo_stack": []}
 

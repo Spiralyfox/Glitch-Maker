@@ -332,6 +332,7 @@ def _cleanup(path):
 
 def load_audio(filepath: str) -> tuple[np.ndarray, int]:
     """Charge un fichier audio et retourne (numpy_array, sample_rate)."""
+    _log.info("load_audio called for: %s", filepath)
     if not os.path.isfile(filepath):
         raise FileNotFoundError(f"File not found: {filepath}")
     ext = os.path.splitext(filepath)[1].lower()
@@ -340,7 +341,9 @@ def load_audio(filepath: str) -> tuple[np.ndarray, int]:
     # 1. soundfile (WAV, FLAC, OGG, AIFF)
     if ext in (".wav", ".flac", ".ogg", ".aiff"):
         try:
+            _log.info("Attempting soundfile load...")
             data, sr = sf.read(filepath, dtype="float32", always_2d=True)
+            _log.info("Audio loaded (soundfile): %d samples @ %d Hz", len(data), sr)
             return _ensure_stereo(data), sr
         except Exception as e:
             errors.append(f"soundfile: {e}")
@@ -350,6 +353,7 @@ def load_audio(filepath: str) -> tuple[np.ndarray, int]:
     if ffmpeg:
         tmp = None
         try:
+            _log.info("Attempting FFmpeg load: %s", ffmpeg)
             tmp = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
             tmp.close()
             cmd = [ffmpeg, "-y", "-i", filepath, "-acodec", "pcm_s16le",
@@ -358,6 +362,7 @@ def load_audio(filepath: str) -> tuple[np.ndarray, int]:
                            creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
             data, sr = sf.read(tmp.name, dtype="float32", always_2d=True)
             os.unlink(tmp.name)
+            _log.info("Audio loaded (ffmpeg): %d samples", len(data))
             return _ensure_stereo(data), sr
         except Exception as e:
             errors.append(f"ffmpeg: {e}")
@@ -367,6 +372,7 @@ def load_audio(filepath: str) -> tuple[np.ndarray, int]:
 
     # 3. pydub
     try:
+        _log.info("Attempting pydub load...")
         _sync_pydub_ffmpeg()
         from pydub import AudioSegment
         seg = AudioSegment.from_file(filepath)
@@ -374,18 +380,21 @@ def load_audio(filepath: str) -> tuple[np.ndarray, int]:
         samples = np.array(seg.get_array_of_samples(), dtype=np.float32)
         samples /= float(2 ** (seg.sample_width * 8 - 1))
         samples = samples.reshape(-1, seg.channels)
+        _log.info("Audio loaded (pydub): %d samples @ %d Hz", len(samples), sr)
         return _ensure_stereo(samples), sr
     except Exception as e:
         errors.append(f"pydub: {e}")
 
     # 4. librosa
     try:
+        _log.info("Attempting librosa load...")
         import librosa
         y, sr = librosa.load(filepath, sr=None, mono=False)
         if y.ndim == 1:
             data = np.column_stack([y, y])
         else:
             data = y.T
+        _log.info("Audio loaded (librosa): %d samples @ %d Hz", len(data), sr)
         return _ensure_stereo(data.astype(np.float32)), sr
     except Exception as e:
         errors.append(f"librosa: {e}")
@@ -448,6 +457,8 @@ def _export_mp3_lameenc(data: np.ndarray, sr: int, filepath: str):
 
 def export_audio(data: np.ndarray, sr: int, filepath: str, fmt: str = "wav"):
     """Exporte en MP3 ou FLAC via FFmpeg/pydub."""
+    _log.info("Exporting audio (%s): %s", fmt, filepath)
+    ext = os.path.splitext(filepath)[1].lower()
     if fmt == "wav":
         export_wav(data, sr, filepath)
         return
