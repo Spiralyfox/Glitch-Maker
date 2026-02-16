@@ -631,110 +631,34 @@ class WaveOnduleeDialog(_Base):
         self.sp.setValue(p.get("speed", 3.0)); self.pd.setValue(p.get("pitch_depth", 0.4))
         self.vd.setValue(p.get("vol_depth", 0.3)); self.st.setChecked(p.get("stereo_offset", True))
 
-class AutotuneDialog(_Base):
-    def __init__(self, p=None):
-        """Initialise les sliders de parametres pour Autotune."""
-        super().__init__("Autotune", p)
-        self.sp = _slider_float(self._lo, "Speed (0=soft, 1=hard T-Pain)", 0.0, 1.0, 0.8, 0.05, 2)
-        self._row("Key")
-        self.key = QComboBox()
-        self.key.addItems(["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"])
-        self._lo.addWidget(self.key)
-        self._row("Scale")
-        self.scale = QComboBox()
-        self.scale.addItems(["chromatic", "major", "minor", "pentatonic", "blues", "dorian", "mixolydian"])
-        self._lo.addWidget(self.scale)
-        self.mx = _slider_float(self._lo, "Mix", 0.0, 1.0, 1.0, 0.05, 2)
-        self._finish()
-    def get_params(self):
-        """Retourne les parametres actuels sous forme de dict."""
-        return {"speed": self.sp.value(), "key": self.key.currentText(),
-                "scale": self.scale.currentText(), "mix": self.mx.value()}
-    def set_params(self, p):
-        """Charge les parametres depuis un dict."""
-        self.sp.setValue(p.get("speed", 0.8))
-        idx = self.key.findText(p.get("key", "C"))
-        if idx >= 0: self.key.setCurrentIndex(idx)
-        idx = self.scale.findText(p.get("scale", "chromatic"))
-        if idx >= 0: self.scale.setCurrentIndex(idx)
-        self.mx.setValue(p.get("mix", 1.0))
-
-
-# ─── New: Space & Texture ───
 
 class RobotDialog(_Base):
     def __init__(self, p=None):
         """Initialise les sliders de parametres pour Robot."""
         super().__init__("Robotic Voice", p)
-        self.gr = _slider_int(self._lo, "Grain size (ms)", 3, 50, 8, " ms")
-        self.am = _slider_float(self._lo, "Robot amount", 0.0, 1.0, 0.7, 0.05, 2)
-        self.mt = _slider_float(self._lo, "Metallic", 0.0, 1.0, 0.4, 0.05, 2)
-        self.dn = _slider_float(self._lo, "Digital noise", 0.0, 1.0, 0.15, 0.05, 2)
-        self.mo = _slider_float(self._lo, "Monotone", 0.0, 1.0, 0.0, 0.05, 2)
-        self.ph = _slider_int(self._lo, "Pitch (Hz, for monotone)", 50, 500, 150, " Hz")
+        self.gms = _slider_int(self._lo, "Grain size (ms)", 1, 100, 8, " ms")
+        self.amt = _slider_float(self._lo, "Robotize", 0.0, 1.0, 0.7, 0.1, 2)
+        self.met = _slider_float(self._lo, "Metallic", 0.0, 1.0, 0.4, 0.1, 2)
+        self.dig = _slider_float(self._lo, "Digital Noise", 0.0, 1.0, 0.15, 0.05, 2)
+        self.hz = _slider_int(self._lo, "Base Pitch (Hz)", 50, 2000, 150, " Hz")
+        self.mn = QCheckBox("Monotone (Force Pitch)"); self._lo.addWidget(self.mn)
         self._finish()
+
     def get_params(self):
         """Retourne les parametres actuels sous forme de dict."""
-        return {"grain_ms": self.gr.value(), "robot_amount": self.am.value(),
-                "metallic": self.mt.value(), "digital_noise": self.dn.value(),
-                "monotone": self.mo.value(), "pitch_hz": self.ph.value()}
+        return {"grain_ms": self.gms.value(), "robot_amount": self.amt.value(),
+                "metallic": self.met.value(), "digital_noise": self.dig.value(),
+                "pitch_hz": self.hz.value(), "monotone": 1.0 if self.mn.isChecked() else 0.0}
+
     def set_params(self, p):
         """Charge les parametres depuis un dict."""
-        self.gr.setValue(p.get("grain_ms", 8)); self.am.setValue(p.get("robot_amount", 0.7))
-        self.mt.setValue(p.get("metallic", 0.4)); self.dn.setValue(p.get("digital_noise", 0.15))
-        self.mo.setValue(p.get("monotone", 0.0)); self.ph.setValue(p.get("pitch_hz", 150))
+        self.gms.setValue(int(p.get("grain_ms", 8)))
+        self.amt.setValue(p.get("robot_amount", 0.7))
+        self.met.setValue(p.get("metallic", 0.4))
+        self.dig.setValue(p.get("digital_noise", 0.15))
+        self.hz.setValue(int(p.get("pitch_hz", 150)))
+        self.mn.setChecked(bool(p.get("monotone", 0.0)))
 
-class HyperDialog(_Base):
-    def __init__(self, p=None):
-        """Initialise les sliders de parametres pour Hyper."""
-        super().__init__("Hyper", p)
-        self._lo.addWidget(QLabel("One-knob hyperpop processor"))
-        self.it = _slider_float(self._lo, "Intensity", 0.0, 1.0, 0.6, 0.05, 2)
-        self.sh = _slider_float(self._lo, "Shimmer (octave up)", 0.0, 1.0, 0.3, 0.05, 2)
-        self.br = _slider_float(self._lo, "Brightness", 0.0, 1.0, 0.5, 0.05, 2)
-        self.cr = _slider_float(self._lo, "Digital crush", 0.0, 1.0, 0.0, 0.05, 2)
-        self.wd = _slider_float(self._lo, "Stereo width", 0.0, 1.0, 0.5, 0.05, 2)
-        self._finish()
-    def get_params(self):
-        """Retourne les parametres actuels sous forme de dict."""
-        return {"intensity": self.it.value(), "shimmer": self.sh.value(),
-                "brightness": self.br.value(), "crush": self.cr.value(), "width": self.wd.value()}
-    def set_params(self, p):
-        """Charge les parametres depuis un dict."""
-        self.it.setValue(p.get("intensity", 0.6)); self.sh.setValue(p.get("shimmer", 0.3))
-        self.br.setValue(p.get("brightness", 0.5)); self.cr.setValue(p.get("crush", 0.0))
-        self.wd.setValue(p.get("width", 0.5))
-
-
-# ─── New: Glitch ───
-
-class VocalChopDialog(_Base):
-    def __init__(self, p=None):
-        """Initialise les sliders de parametres pour VocalChop."""
-        super().__init__("Vocal Chop", p)
-        self.bpm = _slider_int(self._lo, "BPM", 60, 220, 140, " bpm")
-        self._row("Pattern")
-        self.pat = QComboBox()
-        self.pat.addItems(["straight", "dotted", "triplet", "glitch", "staccato",
-                           "syncopated", "chaos", "rapid"])
-        self.pat.setCurrentText("glitch")
-        self._lo.addWidget(self.pat)
-        self.gs = _slider_float(self._lo, "Gate shape", 0.1, 1.0, 0.8, 0.05, 2)
-        self.pv = _slider_float(self._lo, "Pitch variation", 0.0, 1.0, 0.0, 0.05, 2)
-        self.rv = QCheckBox("Reverse every other hit"); self._lo.addWidget(self.rv)
-        self._finish()
-    def get_params(self):
-        """Retourne les parametres actuels sous forme de dict."""
-        return {"bpm": self.bpm.value(), "pattern": self.pat.currentText(),
-                "gate_shape": self.gs.value(), "pitch_variation": self.pv.value(),
-                "reverse_hits": self.rv.isChecked()}
-    def set_params(self, p):
-        """Charge les parametres depuis un dict."""
-        self.bpm.setValue(p.get("bpm", 140))
-        idx = self.pat.findText(p.get("pattern", "glitch"))
-        if idx >= 0: self.pat.setCurrentIndex(idx)
-        self.gs.setValue(p.get("gate_shape", 0.8)); self.pv.setValue(p.get("pitch_variation", 0.0))
-        self.rv.setChecked(p.get("reverse_hits", False))
 
 class TapeGlitchDialog(_Base):
     def __init__(self, p=None):

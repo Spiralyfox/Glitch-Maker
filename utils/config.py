@@ -2,7 +2,7 @@
 import os, sys, json, shutil
 
 APP_NAME = "Glitch Maker"
-APP_VERSION = "7.2"
+APP_VERSION = "8.1"
 WINDOW_MIN_WIDTH = 1050
 WINDOW_MIN_HEIGHT = 650
 RECORDING_SAMPLE_RATE = 44100
@@ -55,7 +55,7 @@ COLORS_LIGHT = {
 
 # ── Preset tag colors (centralized, step 46) ──
 TAG_COLORS = {
-    "Autotune": "#f72585", "Hyperpop": "#ff006e", "Digicore": "#7209b7",
+    "Hyperpop": "#ff006e", "Digicore": "#7209b7",
     "Emocore": "#e94560", "Glitch": "#9b2226", "Vocal": "#4cc9f0",
     "Ambient": "#2a9d8f", "Lo-fi": "#606c38", "Aggressive": "#bb3e03",
     "Experimental": "#b5179e", "Electro": "#0ea5e9", "Tape": "#6b705c",

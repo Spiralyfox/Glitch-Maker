@@ -5,7 +5,7 @@ All 28 effects sorted alphabetically.
 
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QLabel, QScrollArea,
-    QWidget, QPushButton, QHBoxLayout
+    QWidget, QPushButton, QHBoxLayout, QLineEdit
 )
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont, QColor, QPainter, QBrush
@@ -14,7 +14,6 @@ from utils.translator import t
 
 # (letter, color, cat_key) — sorted alphabetically by effect name
 ENTRIES = sorted([
-    ("\u266a", "#f72585",  "autotune"),
     ("B", "#533483",  "bitcrusher"),
     ("F", "#457b9d",  "buffer_freeze"),
     ("C", "#2a6478",  "chorus"),
@@ -23,7 +22,6 @@ ENTRIES = sorted([
     ("W", "#b5179e",  "distortion"),
     ("L", "#264653",  "filter"),
     ("G", "#7b2d8e",  "granular"),
-    ("\u26a1","#ff006e",  "hyper"),
     ("O", "#e76f51",  "ott"),
     ("\u229d", "#2563eb",  "pan"),
     ("A", "#6d597a",  "phaser"),
@@ -40,7 +38,6 @@ ENTRIES = sorted([
     ("T", "#c74b50",  "time_stretch"),
     ("~", "#e07c24",  "tremolo"),
     ("V", "#606c38",  "vinyl"),
-    ("\u2702", "#7209b7",  "vocal_chop"),
     ("U", "#4cc9f0",  "volume"),
 ], key=lambda x: t(f"cat.{x[2]}.name"))
 
@@ -78,6 +75,22 @@ class CatalogDialog(QDialog):
         sub.setWordWrap(True)
         lo.addWidget(sub)
 
+        # Search bar
+        self.search = QLineEdit()
+        self.search.setPlaceholderText("Search effects...")
+        self.search.setStyleSheet(f"""
+            QLineEdit {{
+                background: {COLORS['bg_dark']};
+                color: {COLORS['text']};
+                border: 1px solid {COLORS['border']};
+                border-radius: 4px;
+                padding: 6px;
+                font-size: 12px;
+            }}
+        """)
+        self.search.textChanged.connect(self.filter_items)
+        lo.addWidget(self.search)
+
         scroll = QScrollArea(); scroll.setWidgetResizable(True)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         scroll.setStyleSheet(f"""
@@ -89,28 +102,35 @@ class CatalogDialog(QDialog):
         content = QWidget()
         cl = QVBoxLayout(content); cl.setSpacing(6)
 
+        self.items = []
         for letter, color, key in ENTRIES:
             row = QHBoxLayout(); row.setSpacing(10)
             row.addWidget(_IconWidget(letter, color))
 
             tl = QVBoxLayout(); tl.setSpacing(2)
-            name_lbl = QLabel(t(f"cat.{key}.name"))
+            name_txt = t(f"cat.{key}.name")
+            name_lbl = QLabel(name_txt)
             name_lbl.setFont(QFont("Segoe UI", 10, QFont.Weight.Bold))
             name_lbl.setStyleSheet(f"color: {COLORS['text']};")
             tl.addWidget(name_lbl)
 
-            short_lbl = QLabel(t(f"cat.{key}.short"))
+            short_txt = t(f"cat.{key}.short")
+            short_lbl = QLabel(short_txt)
             short_lbl.setStyleSheet(f"color: {COLORS['accent']}; font-size: 10px; font-weight: bold;")
             short_lbl.setWordWrap(True)
             tl.addWidget(short_lbl)
 
-            detail_lbl = QLabel(t(f"cat.{key}.detail"))
+            detail_txt = t(f"cat.{key}.detail")
+            detail_lbl = QLabel(detail_txt)
             detail_lbl.setStyleSheet(f"color: {COLORS['text_dim']}; font-size: 10px;")
             detail_lbl.setWordWrap(True)
             tl.addWidget(detail_lbl)
 
             row.addLayout(tl, stretch=1)
             w = QWidget(); w.setLayout(row)
+            # Store search key for filtering
+            w._search_key = (name_txt + " " + short_txt + " " + detail_txt).lower()
+            self.items.append(w)
             cl.addWidget(w)
 
         cl.addStretch()
@@ -126,3 +146,9 @@ class CatalogDialog(QDialog):
         """)
         btn.clicked.connect(self.accept)
         lo.addWidget(btn)
+
+    def filter_items(self, text):
+        """Filter items based on search text."""
+        t_str = text.lower().strip()
+        for w in self.items:
+            w.setVisible(not t_str or t_str in w._search_key)

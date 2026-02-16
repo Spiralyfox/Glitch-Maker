@@ -261,14 +261,6 @@ def _w_wave_ondulee(audio_data, start, end, sr=44100, **kw):
                         vol_depth=kw.get("vol_depth", 0.3),
                         stereo_offset=kw.get("stereo_offset", True))
 
-def _w_autotune(audio_data, start, end, sr=44100, **kw):
-    """Wrapper : applique l effet Autotune."""
-    from core.effects.autotune import autotune
-    return autotune(audio_data, start, end, sr=sr,
-                    speed=kw.get("speed", 0.8),
-                    key=kw.get("key", "C"),
-                    scale=kw.get("scale", "chromatic"),
-                    mix=kw.get("mix", 1.0))
 
 def _w_robot(audio_data, start, end, sr=44100, **kw):
     """Wrapper : applique l effet Robotic Voice."""
@@ -280,26 +272,6 @@ def _w_robot(audio_data, start, end, sr=44100, **kw):
                  digital_noise=kw.get("digital_noise", 0.15),
                  monotone=kw.get("monotone", 0.0),
                  pitch_hz=kw.get("pitch_hz", 150))
-
-def _w_vocal_chop(audio_data, start, end, sr=44100, **kw):
-    """Wrapper : applique l effet Vocal Chop."""
-    from core.effects.vocal_chop import vocal_chop
-    return vocal_chop(audio_data, start, end, sr=sr,
-                      bpm=kw.get("bpm", 140),
-                      pattern=kw.get("pattern", "glitch"),
-                      gate_shape=kw.get("gate_shape", 0.8),
-                      pitch_variation=kw.get("pitch_variation", 0.0),
-                      reverse_hits=kw.get("reverse_hits", False))
-
-def _w_hyper(audio_data, start, end, sr=44100, **kw):
-    """Wrapper : applique l effet Hyper."""
-    from core.effects.hyper import hyper
-    return hyper(audio_data, start, end, sr=sr,
-                 intensity=kw.get("intensity", 0.6),
-                 shimmer=kw.get("shimmer", 0.3),
-                 brightness=kw.get("brightness", 0.5),
-                 crush=kw.get("crush", 0.0),
-                 width=kw.get("width", 0.5))
 
 def _w_tape_glitch(audio_data, start, end, sr=44100, **kw):
     """Wrapper : applique l effet Tape Glitch."""
@@ -331,8 +303,8 @@ def _define_plugins():
         DelayDialog, VinylDialog, OTTDialog,
         StutterDialog, GranularDialog, ShuffleDialog,
         BufferFreezeDialog, DatamoshDialog,
-        WaveOnduleeDialog, AutotuneDialog, RobotDialog,
-        VocalChopDialog, HyperDialog, TapeGlitchDialog,
+        WaveOnduleeDialog, RobotDialog,
+        TapeGlitchDialog,
     )
 
     defs = [
@@ -343,7 +315,6 @@ def _define_plugins():
         ("pitch_shift",   "P", "#16c79a", "Pitch & Time",    "pitch_shift",   PitchShiftDialog,   _w_pitch_shift),
         ("time_stretch",  "T", "#c74b50", "Pitch & Time",    "time_stretch",  TimeStretchDialog,  _w_time_stretch),
         ("tape_stop",     "T", "#3d5a80", "Pitch & Time",    "tape_stop",     TapeStopDialog,     _w_tape_stop),
-        ("autotune",      "A", "#f72585", "Pitch & Time",    "autotune",      AutotuneDialog,     _w_autotune),
         ("wave_ondulee",  "W", "#0ea5e9", "Pitch & Time",    "wave_ondulee",  WaveOnduleeDialog,  _w_wave_ondulee),
         ("saturation",    "S", "#ff6b35", "Distortion",      "saturation",    SaturationDialog,   _w_saturation),
         ("distortion",    "D", "#b5179e", "Distortion",      "distortion",    DistortionDialog,   _w_distortion),
@@ -356,13 +327,11 @@ def _define_plugins():
         ("vinyl",         "V", "#606c38", "Space & Texture", "vinyl",         VinylDialog,        _w_vinyl),
         ("ott",           "O", "#e76f51", "Space & Texture", "ott",           OTTDialog,          _w_ott),
         ("robot",         "R", "#4a00e0", "Space & Texture", "robot",         RobotDialog,        _w_robot),
-        ("hyper",         "H", "#ff006e", "Space & Texture", "hyper",         HyperDialog,        _w_hyper),
         ("stutter",       "S", "#e94560", "Glitch",          "stutter",       StutterDialog,      _w_stutter),
         ("granular",      "G", "#7b2d8e", "Glitch",          "granular",      GranularDialog,     _w_granular),
         ("shuffle",       "S", "#bb3e03", "Glitch",          "shuffle",       ShuffleDialog,      _w_shuffle),
         ("buffer_freeze", "B", "#457b9d", "Glitch",          "buffer_freeze", BufferFreezeDialog,  _w_buffer_freeze),
         ("datamosh",      "D", "#9b2226", "Glitch",          "datamosh",      DatamoshDialog,     _w_datamosh),
-        ("vocal_chop",    "V", "#7209b7", "Glitch",          "vocal_chop",    VocalChopDialog,    _w_vocal_chop),
         ("tape_glitch",   "T", "#6b705c", "Glitch",          "tape_glitch",   TapeGlitchDialog,   _w_tape_glitch),
     ]
     plugins = {}

@@ -1,349 +1,525 @@
 <!DOCTYPE html>
 <html lang="fr">
+
 <head>
-<meta charset="UTF-8">
-<title>Glitch Maker — Mode d'emploi</title>
-<style>
-body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0d0d1a; color: #e0e0e0; max-width: 820px; margin: 0 auto; padding: 24px; line-height: 1.7; }
-h1 { color: #7c5cfc; font-size: 28px; border-bottom: 2px solid #2a2a4a; padding-bottom: 10px; }
-h2 { color: #7c5cfc; font-size: 20px; margin-top: 36px; border-bottom: 1px solid #2a2a4a; padding-bottom: 6px; }
-h3 { color: #a78bfa; font-size: 15px; margin-top: 24px; }
-p { margin: 8px 0; }
-b { color: #c0c0e0; }
-a { color: #7c5cfc; }
-code { background: #1a1a30; padding: 2px 6px; border-radius: 3px; font-size: 13px; }
-kbd { background: #252545; border: 1px solid #3a3a5a; border-radius: 4px; padding: 2px 7px; font-size: 12px; color: #e0e0e0; }
-table { width: 100%; border-collapse: collapse; margin: 12px 0; }
-th, td { border: 1px solid #2a2a4a; padding: 8px 12px; text-align: left; font-size: 13px; }
-th { background: #1a1a30; color: #a78bfa; }
-.tip { background: #1a1a30; border-left: 3px solid #7c5cfc; padding: 10px 14px; margin: 12px 0; border-radius: 0 6px 6px 0; font-size: 13px; }
-.audio-desc { background: #151528; border-left: 3px solid #f59e0b; padding: 8px 14px; margin: 8px 0; border-radius: 0 6px 6px 0; font-size: 13px; font-style: italic; color: #d4d4aa; }
-</style>
+    <meta charset="UTF-8">
+    <title>Glitch Maker — Mode d'emploi</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: #0d0d1a;
+            color: #e0e0e0;
+            max-width: 820px;
+            margin: 0 auto;
+            padding: 24px;
+            line-height: 1.7;
+        }
+
+        h1 {
+            color: #7c5cfc;
+            font-size: 28px;
+            border-bottom: 2px solid #2a2a4a;
+            padding-bottom: 10px;
+        }
+
+        h2 {
+            color: #7c5cfc;
+            font-size: 20px;
+            margin-top: 36px;
+            border-bottom: 1px solid #2a2a4a;
+            padding-bottom: 6px;
+        }
+
+        h3 {
+            color: #a78bfa;
+            font-size: 15px;
+            margin-top: 24px;
+        }
+
+        p {
+            margin: 8px 0;
+        }
+
+        b {
+            color: #c0c0e0;
+        }
+
+        a {
+            color: #7c5cfc;
+        }
+
+        code {
+            background: #1a1a30;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 13px;
+        }
+
+        kbd {
+            background: #252545;
+            border: 1px solid #3a3a5a;
+            border-radius: 4px;
+            padding: 2px 7px;
+            font-size: 12px;
+            color: #e0e0e0;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 12px 0;
+        }
+
+        th,
+        td {
+            border: 1px solid #2a2a4a;
+            padding: 8px 12px;
+            text-align: left;
+            font-size: 13px;
+        }
+
+        th {
+            background: #1a1a30;
+            color: #a78bfa;
+        }
+
+        .tip {
+            background: #1a1a30;
+            border-left: 3px solid #7c5cfc;
+            padding: 10px 14px;
+            margin: 12px 0;
+            border-radius: 0 6px 6px 0;
+            font-size: 13px;
+        }
+
+        .audio-desc {
+            background: #151528;
+            border-left: 3px solid #f59e0b;
+            padding: 8px 14px;
+            margin: 8px 0;
+            border-radius: 0 6px 6px 0;
+            font-size: 13px;
+            font-style: italic;
+            color: #d4d4aa;
+        }
+    </style>
 </head>
+
 <body>
 
-<h1>🎵 Glitch Maker — Mode d'emploi</h1>
+    <h1>🎵 Glitch Maker — Mode d'emploi</h1>
 
-<p>Glitch Maker est une station de travail d'effets audio créatifs pour le sound design, le glitch art sonore et l'expérimentation musicale. Ce guide couvre chaque fonctionnalité : ce qu'elle fait, comment s'en servir, et ce que ça donne au niveau sonore.</p>
+    <p>Glitch Maker est une station de travail d'effets audio créatifs pour le sound design, le glitch art sonore et
+        l'expérimentation musicale. Ce guide couvre chaque fonctionnalité : ce qu'elle fait, comment s'en servir, et ce
+        que ça donne au niveau sonore.</p>
 
-<!-- ═══════════════════════════════════ -->
-<h2>🖥️ Vue d'ensemble de l'interface</h2>
+    <!-- ═══════════════════════════════════ -->
+    <h2>🖥️ Vue d'ensemble de l'interface</h2>
 
-<p>L'interface est divisée en trois colonnes :</p>
+    <p>L'interface est divisée en trois colonnes :</p>
 
-<p><b>Panneau gauche — Effets</b> : liste les 28 effets disponibles organisés par catégorie. Barre de recherche pour filtrer, étoile pour les favoris. Basculez entre la vue effets (FX) et presets (PR).</p>
+    <p><b>Panneau gauche — Effets</b> : liste les 25 effets disponibles organisés par catégorie. Barre de recherche pour
+        filtrer, étoile pour les favoris. Basculez entre la vue effets (FX) et presets (PR).</p>
 
-<p><b>Centre — Waveform &amp; Timeline</b> : l'espace de travail principal. En haut, la forme d'onde avec sélection, marqueurs et tête de lecture. En dessous, la timeline avec les clips colorés. Entre les deux, la barre de transport (Play/Pause/Stop, temps, volume). Analyseur de spectre en bas à droite.</p>
+    <p><b>Centre — Waveform &amp; Timeline</b> : l'espace de travail principal. En haut, la forme d'onde avec sélection,
+        marqueurs et tête de lecture. En dessous, la timeline avec les clips colorés. Entre les deux, la barre de
+        transport (Play/Pause/Stop, temps, volume). Analyseur de spectre en bas à droite.</p>
 
-<p><b>Panneau droit — Historique</b> : toutes les actions effectuées (effets, coupes, fondus, ajouts, enregistrements…) apparaissent ici avec icône et code couleur. Activez/désactivez n'importe quelle action (● / ○), supprimez individuellement, annulez/refaites avec <kbd>Ctrl+Z</kbd> / <kbd>Ctrl+Y</kbd>.</p>
+    <p><b>Panneau droit — Historique</b> : toutes les actions effectuées (effets, coupes, fondus, ajouts,
+        enregistrements…) apparaissent ici avec icône et code couleur. Activez/désactivez n'importe quelle action (● /
+        ○), supprimez individuellement, annulez/refaites avec <kbd>Ctrl+Z</kbd> / <kbd>Ctrl+Y</kbd>.</p>
 
-<!-- ═══════════════════════════════════ -->
-<h2>📂 Charger &amp; Sauvegarder</h2>
+    <!-- ═══════════════════════════════════ -->
+    <h2>📂 Charger &amp; Sauvegarder</h2>
 
-<p><b>File &gt; Open</b> (ou glisser-déposer) — Chargez des fichiers MP3, WAV, FLAC, OGG, ou tout format supporté par FFmpeg.</p>
+    <p><b>File &gt; Open</b> (ou glisser-déposer) — Chargez des fichiers MP3, WAV, FLAC, OGG, ou tout format supporté
+        par FFmpeg.</p>
 
-<p><b>File &gt; Save / Save As</b> — Exportez l'audio traité. WAV pour la qualité sans perte, MP3/FLAC/OGG pour les formats compressés.</p>
+    <p><b>File &gt; Save / Save As</b> — Exportez l'audio traité. WAV pour la qualité sans perte, MP3/FLAC/OGG pour les
+        formats compressés.</p>
 
-<p><b>File &gt; Record</b> — Enregistrez depuis votre micro. La fenêtre d'enregistrement affiche un vumètre animé multibarres avec dégradé de couleur selon le niveau (violet → jaune → rouge), un chronomètre précis au dixième de seconde, et un indicateur d'état clignotant. Cliquez <b>Démarrer</b> pour enregistrer, <b>Arrêter</b> pour terminer, puis <b>Ajouter à la timeline</b> pour insérer l'audio dans votre projet. L'audio enregistré est rééchantillonné automatiquement pour correspondre au taux du projet, évitant tout problème de hauteur.</p>
+    <p><b>File &gt; Record</b> — Enregistrez depuis votre micro. La fenêtre d'enregistrement affiche un vumètre animé
+        multibarres avec dégradé de couleur selon le niveau (violet → jaune → rouge), un chronomètre précis au dixième
+        de seconde, et un indicateur d'état clignotant. Cliquez <b>Démarrer</b> pour enregistrer, <b>Arrêter</b> pour
+        terminer, puis <b>Ajouter à la timeline</b> pour insérer l'audio dans votre projet. L'audio enregistré est
+        rééchantillonné automatiquement pour correspondre au taux du projet, évitant tout problème de hauteur.</p>
 
-<p><b>File &gt; Open Project / Save Project</b> — Sauvegardez et rechargez vos projets (.gspi) avec audio, clips et historique complet.</p>
+    <p><b>File &gt; Open Project / Save Project</b> — Sauvegardez et rechargez vos projets (.gspi) avec audio, clips et
+        historique complet.</p>
 
-<p><b>Bouton ＋</b> (barre de transport) — Ajoutez un clip audio supplémentaire à la suite dans la timeline.</p>
+    <p><b>Bouton ＋</b> (barre de transport) — Ajoutez un clip audio supplémentaire à la suite dans la timeline.</p>
 
-<div class="tip">💡 FFmpeg est téléchargé automatiquement au premier lancement s'il n'est pas trouvé. Cela active le support MP3, FLAC et OGG.</div>
+    <div class="tip">💡 FFmpeg est téléchargé automatiquement au premier lancement s'il n'est pas trouvé. Cela active le
+        support MP3, FLAC et OGG.</div>
 
-<!-- ═══════════════════════════════════ -->
-<h2>▶️ Lecture &amp; Transport</h2>
+    <!-- ═══════════════════════════════════ -->
+    <h2>▶️ Lecture &amp; Transport</h2>
 
-<p><b>Play / Pause</b> — <kbd>Espace</kbd> ou clic. Pause gèle la position, reprend exactement au même endroit.</p>
+    <p><b>Play / Pause</b> — <kbd>Espace</kbd> ou clic. Pause gèle la position, reprend exactement au même endroit.</p>
 
-<p><b>Stop</b> — Arrête et revient à l'ancre bleue, au début de la sélection, ou au début du fichier.</p>
+    <p><b>Stop</b> — Arrête et revient à l'ancre bleue, au début de la sélection, ou au début du fichier.</p>
 
-<p><b>Boucle</b> — Sans sélection, la lecture reboucle au début. Avec sélection, elle boucle dans la zone sélectionnée.</p>
+    <p><b>Boucle</b> — Sans sélection, la lecture reboucle au début. Avec sélection, elle boucle dans la zone
+        sélectionnée.</p>
 
-<p><b>Volume</b> — Curseur de 0 % à 100 % avec pourcentage affiché.</p>
+    <p><b>Volume</b> — Curseur de 0 % à 100 % avec pourcentage affiché.</p>
 
-<p><b>Affichage du temps</b> — Position / durée totale au format MM:SS.ms. Durée de sélection affichée quand une zone est active.</p>
+    <p><b>Affichage du temps</b> — Position / durée totale au format MM:SS.ms. Durée de sélection affichée quand une
+        zone est active.</p>
 
-<!-- ═══════════════════════════════════ -->
-<h2>🎯 Waveform &amp; Sélection</h2>
+    <!-- ═══════════════════════════════════ -->
+    <h2>🎯 Waveform &amp; Sélection</h2>
 
-<p><b>Ancre bleue</b> — Cliquez sur la waveform pour placer un repère de lecture. Stop ramène à l'ancre.</p>
+    <p><b>Ancre bleue</b> — Cliquez sur la waveform pour placer un repère de lecture. Stop ramène à l'ancre.</p>
 
-<p><b>Sélection rouge</b> — Cliquez-glissez pour sélectionner une zone. Les effets s'appliquent à la sélection (ou à tout le fichier si pas de sélection).</p>
+    <p><b>Sélection rouge</b> — Cliquez-glissez pour sélectionner une zone. Les effets s'appliquent à la sélection (ou à
+        tout le fichier si pas de sélection).</p>
 
-<p><b>Sélection pendant la lecture</b> — Si la lecture est active, glisser met automatiquement en pause. Relâcher reprend dans la zone sélectionnée.</p>
+    <p><b>Sélection pendant la lecture</b> — Si la lecture est active, glisser met automatiquement en pause. Relâcher
+        reprend dans la zone sélectionnée.</p>
 
-<p><b>Clic droit dans une sélection</b> :</p>
-<p>• <b>Couper — Remplacer par du silence</b> : une confirmation est demandée, puis la zone devient silencieuse et le clip se divise en 3 parties.<br>
-• <b>Couper — Supprimer &amp; recoller</b> : une confirmation est demandée, puis la zone est supprimée et les parties restantes sont jointes.</p>
+    <p><b>Clic droit dans une sélection</b> :</p>
+    <p>• <b>Couper — Remplacer par du silence</b> : une confirmation est demandée, puis la zone devient silencieuse et
+        le clip se divise en 3 parties.<br>
+        • <b>Couper — Supprimer &amp; recoller</b> : une confirmation est demandée, puis la zone est supprimée et les
+        parties restantes sont jointes.</p>
 
-<p><b>Clic droit n'importe où</b> — Ajoutez un marqueur, supprimez un marqueur proche, ou effacez tous les marqueurs. Ces options sont disponibles partout sur la waveform, qu'il y ait une sélection ou non.</p>
+    <p><b>Clic droit n'importe où</b> — Ajoutez un marqueur, supprimez un marqueur proche, ou effacez tous les
+        marqueurs. Ces options sont disponibles partout sur la waveform, qu'il y ait une sélection ou non.</p>
 
-<p><b>Zoom</b> — Molette sur la waveform. Minimap au-dessus pour naviguer dans la vue zoomée.</p>
+    <p><b>Zoom</b> — Molette sur la waveform. Minimap au-dessus pour naviguer dans la vue zoomée.</p>
 
-<!-- ═══════════════════════════════════ -->
-<h2>🎼 Timeline</h2>
+    <!-- ═══════════════════════════════════ -->
+    <h2>🎼 Timeline</h2>
 
-<p>La timeline affiche l'audio sous forme de blocs colorés. Chaque opération structurelle crée ou modifie des clips.</p>
+    <p>La timeline affiche l'audio sous forme de blocs colorés. Chaque opération structurelle crée ou modifie des clips.
+    </p>
 
-<p><b>Clic</b> — Sautez à une position. Cliquez un clip pour le sélectionner.</p>
+    <p><b>Clic</b> — Sautez à une position. Cliquez un clip pour le sélectionner.</p>
 
-<p><b>Clic droit sur un clip</b> :</p>
-<p>• <b>Supprimer</b> (ou <kbd>Suppr</kbd>) — Demande confirmation, puis supprime le clip. Les autres se repositionnent.<br>
-• <b>Split</b> — Divise le clip en deux à la position actuelle.<br>
-• <b>Duplicate</b> — Crée une copie du clip.<br>
-• <b>Fade In / Fade Out</b> — Ouvre l'éditeur d'enveloppe (voir ci-dessous).</p>
+    <p><b>Clic droit sur un clip</b> :</p>
+    <p>• <b>Supprimer</b> (ou <kbd>Suppr</kbd>) — Demande confirmation, puis supprime le clip. Les autres se
+        repositionnent.<br>
+        • <b>Split</b> — Divise le clip en deux à la position actuelle.<br>
+        • <b>Duplicate</b> — Crée une copie du clip.<br>
+        • <b>Fade In / Fade Out</b> — Ouvre l'éditeur d'enveloppe (voir ci-dessous).</p>
 
-<p><b>Glisser-déposer</b> — Réorganisez l'ordre des clips.</p>
+    <p><b>Glisser-déposer</b> — Réorganisez l'ordre des clips.</p>
 
-<h3>Éditeur de fondu (Fade In / Fade Out)</h3>
+    <h3>Éditeur de fondu (Fade In / Fade Out)</h3>
 
-<p>La fenêtre de fondu affiche la waveform du clip avec une enveloppe éditable :</p>
-<p>• <b>Enveloppe visuelle</b> — Lignes rouges (haut/bas en miroir) enserrent l'onde. Violette = résultat, grise = original.<br>
-• <b>Mode Points</b> — Clic gauche = ajouter un point. Glissez = ajuster. Clic droit = supprimer.<br>
-• <b>Mode Bend</b> — Tirez un segment entre deux points pour créer un arc de Bézier (haut = logarithmique, bas = exponentiel).<br>
-• <b>Durée</b> — Slider de 10 ms à la durée totale du clip.<br>
-• <b>Play</b> — Prévisualisation avec barre cyan en temps réel.<br>
-• <b>Mémoire</b> — Rouvrir le dialogue restaure vos points et courbures.</p>
-<div class="audio-desc">🔊 Droite = linéaire. Bombée haut = montée rapide puis plateau. Bombée bas = reste bas puis surgit. Points multiples = fondus multi-étapes.</div>
+    <p>La fenêtre de fondu affiche la waveform du clip avec une enveloppe éditable :</p>
+    <p>• <b>Enveloppe visuelle</b> — Lignes rouges (haut/bas en miroir) enserrent l'onde. Violette = résultat, grise =
+        original.<br>
+        • <b>Mode Points</b> — Clic gauche = ajouter un point. Glissez = ajuster. Clic droit = supprimer.<br>
+        • <b>Mode Bend</b> — Tirez un segment entre deux points pour créer un arc de Bézier (haut = logarithmique, bas =
+        exponentiel).<br>
+        • <b>Durée</b> — Slider de 10 ms à la durée totale du clip.<br>
+        • <b>Play</b> — Prévisualisation avec barre cyan en temps réel.<br>
+        • <b>Mémoire</b> — Rouvrir le dialogue restaure vos points et courbures.</p>
+    <div class="audio-desc">🔊 Droite = linéaire. Bombée haut = montée rapide puis plateau. Bombée bas = reste bas puis
+        surgit. Points multiples = fondus multi-étapes.</div>
 
-<p><b>Zoom timeline</b> — Molette pour zoomer indépendamment de la waveform.</p>
+    <p><b>Zoom timeline</b> — Molette pour zoomer indépendamment de la waveform.</p>
 
-<!-- ═══════════════════════════════════ -->
-<h2>📌 Marqueurs</h2>
+    <!-- ═══════════════════════════════════ -->
+    <h2>📌 Marqueurs</h2>
 
-<p><kbd>M</kbd> — Ajouter un marqueur à la position actuelle.</p>
-<p><kbd>Ctrl+→</kbd> / <kbd>Ctrl+←</kbd> — Sauter au marqueur suivant / précédent.</p>
-<p>Clic droit n'importe où sur la waveform pour ajouter, supprimer ou effacer des marqueurs.</p>
+    <p><kbd>M</kbd> — Ajouter un marqueur à la position actuelle.</p>
+    <p><kbd>Ctrl+→</kbd> / <kbd>Ctrl+←</kbd> — Sauter au marqueur suivant / précédent.</p>
+    <p>Clic droit n'importe où sur la waveform pour ajouter, supprimer ou effacer des marqueurs.</p>
 
-<!-- ═══════════════════════════════════ -->
-<h2>🎵 Métronome &amp; Grille</h2>
+    <!-- ═══════════════════════════════════ -->
+    <h2>🎵 Métronome &amp; Grille</h2>
 
-<p>Bouton <b>Metronome</b> dans la barre d'outils pour activer/désactiver. Le métronome joue des clics au BPM configuré. La grille dessine des lignes verticales alignées aux temps sur la waveform.</p>
+    <p>Bouton <b>Metronome</b> dans la barre d'outils pour activer/désactiver. Le métronome joue des clics au BPM
+        configuré. La grille dessine des lignes verticales alignées aux temps sur la waveform.</p>
 
-<p><b>Options &gt; Métronome</b> — BPM (20–300), volume (curseur avec pourcentage), activation.</p>
+    <p><b>Options &gt; Métronome</b> — BPM (20–300), volume (curseur avec pourcentage), activation.</p>
 
-<div class="audio-desc">🔊 Clic court et sec à chaque temps. À 120 BPM = 2 clics/seconde. La grille aide à aligner les sélections sur les temps musicaux.</div>
+    <div class="audio-desc">🔊 Clic court et sec à chaque temps. À 120 BPM = 2 clics/seconde. La grille aide à aligner
+        les sélections sur les temps musicaux.</div>
 
-<!-- ═══════════════════════════════════ -->
-<h2>🔊 Analyseur de spectre</h2>
+    <!-- ═══════════════════════════════════ -->
+    <h2>🔊 Analyseur de spectre</h2>
 
-<p>Graphique à barres en temps réel pendant la lecture : graves à gauche, aigus à droite. Visualisez l'impact de vos effets.</p>
+    <p>Graphique à barres en temps réel pendant la lecture : graves à gauche, aigus à droite. Visualisez l'impact de vos
+        effets.</p>
 
-<!-- ═══════════════════════════════════ -->
-<h2>📜 Historique</h2>
+    <!-- ═══════════════════════════════════ -->
+    <h2>📜 Historique</h2>
 
-<p>Le panneau droit affiche l'historique complet de toutes vos actions, identifiées par icône et couleur :</p>
+    <p>Le panneau droit affiche l'historique complet de toutes vos actions, identifiées par icône et couleur :</p>
 
-<p>• 🎛 <b>Effets</b> (violet) — Effets audio. Activables/désactivables (● / ○).<br>
-• 📈 <b>Automations</b> (violet foncé) — Automations de paramètres. Activables/désactivables.<br>
-• ✂ <b>Coupes &amp; Splits</b> (orange) — Coupes silence, coupes splice, divisions.<br>
-• 🔊🔉 <b>Fondus</b> (vert) — Fade In / Fade Out sur les clips.<br>
-• ➕ <b>Ajouts</b> (bleu) — Clips ajoutés à la timeline.<br>
-• 🎙 <b>Enregistrements</b> (rouge) — Audio enregistré.<br>
-• 🗑 <b>Suppressions</b> (gris) — Clips supprimés.<br>
-• 📋 <b>Duplications</b> (bleu) — Clips dupliqués.<br>
-• ↕ <b>Réorganisations</b> (gris) — Changements d'ordre.</p>
+    <p>• 🎛 <b>Effets</b> (violet) — Effets audio. Activables/désactivables (● / ○).<br>
+        • 📈 <b>Automations</b> (violet foncé) — Automations de paramètres. Activables/désactivables.<br>
+        • ✂ <b>Coupes &amp; Splits</b> (orange) — Coupes silence, coupes splice, divisions.<br>
+        • 🔊🔉 <b>Fondus</b> (vert) — Fade In / Fade Out sur les clips.<br>
+        • ➕ <b>Ajouts</b> (bleu) — Clips ajoutés à la timeline.<br>
+        • 🎙 <b>Enregistrements</b> (rouge) — Audio enregistré.<br>
+        • 🗑 <b>Suppressions</b> (gris) — Clips supprimés.<br>
+        • 📋 <b>Duplications</b> (bleu) — Clips dupliqués.<br>
+        • ↕ <b>Réorganisations</b> (gris) — Changements d'ordre.</p>
 
-<h3>Activer / Désactiver</h3>
-<p>Cliquez ● pour désactiver temporairement n'importe quelle action (effets, automations, coupes, fondus, ajouts…). L'audio est entièrement recalculé depuis l'état initial en rejouant toutes les actions activées dans l'ordre.</p>
+    <h3>Activer / Désactiver</h3>
+    <p>Cliquez ● pour désactiver temporairement n'importe quelle action (effets, automations, coupes, fondus, ajouts…).
+        L'audio est entièrement recalculé depuis l'état initial en rejouant toutes les actions activées dans l'ordre.
+    </p>
 
-<div class="tip">💡 <b>Mapping de coordonnées (v7)</b> — Les positions des coupes et des effets sont stockées dans l'espace de l'audio initial. Quand vous activez/désactivez des opérations qui changent la longueur (coupes splice, suppressions…), toutes les positions sont automatiquement recalculées. Les coupes et effets s'appliquent toujours exactement à la même zone audio, quel que soit l'ordre d'activation.</div>
+    <div class="tip">💡 <b>Mapping de coordonnées (v7)</b> — Les positions des coupes et des effets sont stockées dans
+        l'espace de l'audio initial. Quand vous activez/désactivez des opérations qui changent la longueur (coupes
+        splice, suppressions…), toutes les positions sont automatiquement recalculées. Les coupes et effets s'appliquent
+        toujours exactement à la même zone audio, quel que soit l'ordre d'activation.</div>
 
-<h3>Supprimer</h3>
-<p>Cliquez ✕ pour supprimer n'importe quelle action. Confirmation demandée. L'audio est recalculé sans cette action — les autres actions restent intactes.</p>
+    <h3>Supprimer</h3>
+    <p>Cliquez ✕ pour supprimer n'importe quelle action. Confirmation demandée. L'audio est recalculé sans cette action
+        — les autres actions restent intactes.</p>
 
-<h3>Modifier un effet</h3>
-<p>Cliquez ✎ sur un effet dans l'historique pour rouvrir son dialogue avec les paramètres actuels. Ajustez les réglages, prévisualisez, puis validez : l'audio est entièrement recalculé avec les nouveaux paramètres. Les automations et les opérations structurelles (coupes, fondus…) ne sont pas modifiables de cette façon.</p>
+    <h3>Modifier un effet</h3>
+    <p>Cliquez ✎ sur un effet dans l'historique pour rouvrir son dialogue avec les paramètres actuels. Ajustez les
+        réglages, prévisualisez, puis validez : l'audio est entièrement recalculé avec les nouveaux paramètres. Les
+        automations et les opérations structurelles (coupes, fondus…) ne sont pas modifiables de cette façon.</p>
 
-<h3>Annuler / Refaire</h3>
-<p><kbd>Ctrl+Z</kbd> annule, <kbd>Ctrl+Y</kbd> rétablit. Fonctionne pour tous les types d'actions.</p>
+    <h3>Annuler / Refaire</h3>
+    <p><kbd>Ctrl+Z</kbd> annule, <kbd>Ctrl+Y</kbd> rétablit. Fonctionne pour tous les types d'actions.</p>
 
-<!-- ═══════════════════════════════════ -->
-<h2>Automations</h2>
+    <!-- ═══════════════════════════════════ -->
+    <h2>Automations</h2>
 
-<p>Faites varier les paramètres d'effet au fil du temps. Au lieu de valeurs fixes, dessinez des courbes d'évolution sur une zone sélectionnée.</p>
+    <p>Faites varier les paramètres d'effet au fil du temps. Au lieu de valeurs fixes, dessinez des courbes d'évolution
+        sur une zone sélectionnée.</p>
 
-<p><b>Ouvrir</b> — Bouton <b>Automations</b> dans la barre de transport, ou <b>Affichage &gt; Automations</b>.</p>
+    <p><b>Ouvrir</b> — Bouton <b>Automations</b> dans la barre de transport, ou <b>Affichage &gt; Automations</b>.</p>
 
-<h3>Créer une automation</h3>
-<p>1. Glissez sur la mini waveform pour sélectionner une zone.<br>
-2. Cliquez <b>Add Automation</b>, nommez-la, choisissez un effet.<br>
-3. Cochez les paramètres. Chaque paramètre peut être <b>Automated</b> (From → To avec courbe) ou <b>Constant</b> (valeur fixe).<br>
-4. L'éditeur de courbe propose deux modes, sélectionnables en haut du graphique :<br>
-&nbsp;&nbsp;• <b>Points</b> — Clic gauche = ajouter un point. Glissez = déplacer. Clic droit = supprimer (sauf les extrémités).<br>
-&nbsp;&nbsp;• <b>Bend</b> — Glissez un segment entre deux points pour le courber (Bézier quadratique). Vers le haut = montée rapide puis plateau. Vers le bas = plateau puis montée tardive.<br>
-5. La preview waveform en bas montre le résultat en temps réel (grise = original, violette = traité).<br>
-6. <kbd>Espace</kbd> pour prévisualiser avec barre de lecture. <b>Save</b> pour appliquer.</p>
+    <h3>Créer une automation</h3>
+    <p>1. Glissez sur la mini waveform pour sélectionner une zone.<br>
+        2. Cliquez <b>Add Automation</b>, nommez-la, choisissez un effet.<br>
+        3. Cochez les paramètres. Chaque paramètre peut être <b>Automated</b> (From → To avec courbe) ou <b>Constant</b>
+        (valeur fixe).<br>
+        4. L'éditeur de courbe propose deux modes, sélectionnables en haut du graphique :<br>
+        &nbsp;&nbsp;• <b>Points</b> — Clic gauche = ajouter un point. Glissez = déplacer. Clic droit = supprimer (sauf
+        les extrémités).<br>
+        &nbsp;&nbsp;• <b>Bend</b> — Glissez un segment entre deux points pour le courber (Bézier quadratique). Vers le
+        haut = montée rapide puis plateau. Vers le bas = plateau puis montée tardive.<br>
+        5. La preview waveform en bas montre le résultat en temps réel (grise = original, violette = traité).<br>
+        6. <kbd>Espace</kbd> pour prévisualiser avec barre de lecture. <b>Save</b> pour appliquer.</p>
 
-<div class="tip">💡 L'automation s'applique par-dessus les effets déjà dans votre chaîne. Les courbes sont sauvegardées avec le projet.</div>
+    <div class="tip">💡 L'automation s'applique par-dessus les effets déjà dans votre chaîne. Les courbes sont
+        sauvegardées avec le projet.</div>
 
-<h3>Gérer</h3>
-<p><b>ON/OFF</b> — Désactivez/réactivez. <b>Edit</b> — Rouvrez l'éditeur. <b>Del</b> — Supprimez. <b>Redefine region</b> — Changez la zone sans fermer l'éditeur.</p>
+    <h3>Gérer</h3>
+    <p><b>ON/OFF</b> — Désactivez/réactivez. <b>Edit</b> — Rouvrez l'éditeur. <b>Del</b> — Supprimez. <b>Redefine
+            region</b> — Changez la zone sans fermer l'éditeur.</p>
 
-<div class="audio-desc">🔊 Exemples : Filter Cutoff de 200 Hz à 8000 Hz avec une courbe en Bend = ouverture cinématique progressive. Bitcrusher Bit Depth à 8, Downsample de 1 à 32 = désintégration progressive. Volume 100 % → 0 % = fade-out personnalisé avec contrôle total de la courbure.</div>
+    <div class="audio-desc">🔊 Exemples : Filter Cutoff de 200 Hz à 8000 Hz avec une courbe en Bend = ouverture
+        cinématique progressive. Bitcrusher Bit Depth à 8, Downsample de 1 à 32 = désintégration progressive. Volume 100
+        % → 0 % = fade-out personnalisé avec contrôle total de la courbure.</div>
 
 
-<!-- ═══════════════════════════════════ -->
-<h2>Effets — Référence complète</h2>
+    <!-- ═══════════════════════════════════ -->
+    <h2>Effets — Référence complète</h2>
 
-<p>Sélectionnez optionnellement une zone, cliquez sur l'effet, ajustez les paramètres, appliquez.</p>
+    <p>Sélectionnez optionnellement une zone, cliquez sur l'effet, ajustez les paramètres, appliquez.</p>
 
-<div class="tip">💡 Sans sélection, l'effet s'applique à tout le fichier.</div>
+    <div class="tip">💡 Sans sélection, l'effet s'applique à tout le fichier.</div>
 
-<!-- ── Basics ── -->
-<h3>📦 Basics</h3>
+    <!-- ── Basics ── -->
+    <h3>📦 Basics</h3>
 
-<p><b>Reverse</b> — Retourne l'audio à l'envers.</p>
-<div class="audio-desc">🔊 Voix inversée = langue extraterrestre. Coup de batterie = montée progressive. Base du glitch et de l'ambient.</div>
+    <p><b>Reverse</b> — Retourne l'audio à l'envers.</p>
+    <div class="audio-desc">🔊 Voix inversée = langue extraterrestre. Coup de batterie = montée progressive. Base du
+        glitch et de l'ambient.</div>
 
-<p><b>Volume</b> — Ajuste le niveau. Paramètre : gain (dB).</p>
-<div class="audio-desc">🔊 Boost extrême (&gt;12 dB) = distortion par écrêtage, un effet créatif en soi.</div>
+    <p><b>Volume</b> — Ajuste le niveau. Paramètre : gain (dB).</p>
+    <div class="audio-desc">🔊 Boost extrême (&gt;12 dB) = distortion par écrêtage, un effet créatif en soi.</div>
 
-<p><b>Filter</b> — Filtre fréquentiel. Paramètres : type (passe-bas/haut/bande), coupure, résonance.</p>
-<div class="audio-desc">🔊 Passe-bas = son étouffé. Passe-haut = son fin. Passe-bande = effet téléphone. Résonance haute = sifflement à la coupure.</div>
+    <p><b>Filter</b> — Filtre fréquentiel. Paramètres : type (passe-bas/haut/bande), coupure, résonance.</p>
+    <div class="audio-desc">🔊 Passe-bas = son étouffé. Passe-haut = son fin. Passe-bande = effet téléphone. Résonance
+        haute = sifflement à la coupure.</div>
 
-<p><b>Pan / Stéréo</b> — Position dans le champ stéréo.</p>
-<div class="audio-desc">🔊 Pan gauche/droite. Automatiser = sensation de mouvement d'une oreille à l'autre.</div>
+    <p><b>Pan / Stéréo</b> — Position dans le champ stéréo.</p>
+    <div class="audio-desc">🔊 Pan gauche/droite. Automatiser = sensation de mouvement d'une oreille à l'autre.</div>
 
-<!-- ── Pitch & Time ── -->
-<h3>🎵 Pitch &amp; Time</h3>
+    <!-- ── Pitch & Time ── -->
+    <h3>🎵 Pitch &amp; Time</h3>
 
-<p><b>Pitch Shift</b> — Hauteur sans changer la vitesse. Paramètre : demi-tons (-12 à +12).</p>
-<div class="audio-desc">🔊 +12 = chipmunk. -12 = géant. ±1-3 = harmonisation subtile. Extrême = robotique et extraterrestre.</div>
+    <p><b>Pitch Shift</b> — Hauteur sans changer la vitesse. Paramètre : demi-tons (-12 à +12).</p>
+    <div class="audio-desc">🔊 +12 = chipmunk. -12 = géant. ±1-3 = harmonisation subtile. Extrême = robotique et
+        extraterrestre.</div>
 
-<p><b>Time Stretch</b> — Vitesse sans changer la hauteur. Paramètre : facteur.</p>
-<div class="audio-desc">🔊 2.0 = deux fois plus lent. 0.5 = deux fois plus rapide. 4x+ = nappes ambient rêveuses.</div>
+    <p><b>Time Stretch</b> — Vitesse sans changer la hauteur. Paramètre : facteur.</p>
+    <div class="audio-desc">🔊 2.0 = deux fois plus lent. 0.5 = deux fois plus rapide. 4x+ = nappes ambient rêveuses.
+    </div>
 
-<p><b>Tape Stop</b> — Magnétophone qui s'arrête. Paramètre : durée.</p>
-<div class="audio-desc">🔊 0.2s = frein DJ rapide. 2s+ = ralentissement dramatique avec chute de hauteur.</div>
+    <p><b>Tape Stop</b> — Magnétophone qui s'arrête. Paramètre : durée.</p>
+    <div class="audio-desc">🔊 0.2s = frein DJ rapide. 2s+ = ralentissement dramatique avec chute de hauteur.</div>
 
-<p><b>Autotune</b> — Correction de hauteur. Paramètres : tonalité, force.</p>
-<div class="audio-desc">🔊 Force max = snap robotique type T-Pain. Force faible = correction naturelle.</div>
 
-<p><b>Pitch Drift</b> — Modulation ondulante. Paramètres : vitesse, profondeur.</p>
-<div class="audio-desc">🔊 Rapide + peu profond = vibrato. Lent + profond = cassette qu'on étire.</div>
+    <p><b>Pitch Drift</b> — Modulation ondulante. Paramètres : vitesse, profondeur.</p>
+    <div class="audio-desc">🔊 Rapide + peu profond = vibrato. Lent + profond = cassette qu'on étire.</div>
 
-<!-- ── Distortion ── -->
-<h3>🔥 Distortion</h3>
+    <!-- ── Distortion ── -->
+    <h3>🔥 Distortion</h3>
 
-<p><b>Saturation</b> — Distorsion harmonique chaude. Paramètre : drive.</p>
-<div class="audio-desc">🔊 Légère = chaleur d'ampli à lampes. Forte = épaisseur agressive, rugissement grunge.</div>
+    <p><b>Saturation</b> — Distorsion harmonique chaude. Paramètre : drive.</p>
+    <div class="audio-desc">🔊 Légère = chaleur d'ampli à lampes. Forte = épaisseur agressive, rugissement grunge.</div>
 
-<p><b>Distortion</b> — Écrêtage dur. Paramètres : drive, tonalité.</p>
-<div class="audio-desc">🔊 Texture crépitante. Extrême = mur de bruit. Batteries explosives, voix démoniaques.</div>
+    <p><b>Distortion</b> — Écrêtage dur. Paramètres : drive, tonalité.</p>
+    <div class="audio-desc">🔊 Texture crépitante. Extrême = mur de bruit. Batteries explosives, voix démoniaques.</div>
 
-<p><b>Bitcrusher</b> — Réduction de bits / taux. Paramètres : profondeur, taux.</p>
-<div class="audio-desc">🔊 8-4 bits = console rétro. Taux réduit = aliasing métallique. 2 bits = cri numérique.</div>
+    <p><b>Bitcrusher</b> — Réduction de bits / taux. Paramètres : profondeur, taux.</p>
+    <div class="audio-desc">🔊 8-4 bits = console rétro. Taux réduit = aliasing métallique. 2 bits = cri numérique.
+    </div>
 
-<!-- ── Modulation ── -->
-<h3>🌊 Modulation</h3>
+    <!-- ── Modulation ── -->
+    <h3>🌊 Modulation</h3>
 
-<p><b>Chorus</b> — Doublage avec variations. Paramètres : vitesse, profondeur, mix.</p>
-<div class="audio-desc">🔊 Illusion de plusieurs voix. Léger = épaisseur subtile. Fort = texture aqueuse tourbillonnante.</div>
+    <p><b>Chorus</b> — Doublage avec variations. Paramètres : vitesse, profondeur, mix.</p>
+    <div class="audio-desc">🔊 Illusion de plusieurs voix. Léger = épaisseur subtile. Fort = texture aqueuse
+        tourbillonnante.</div>
 
-<p><b>Phaser</b> — Balayage de filtres. Paramètres : vitesse, profondeur, étages.</p>
-<div class="audio-desc">🔊 Son d'avion à réaction. Classique sur guitares et nappes. Plus d'étages = plus spatial.</div>
+    <p><b>Phaser</b> — Balayage de filtres. Paramètres : vitesse, profondeur, étages.</p>
+    <div class="audio-desc">🔊 Son d'avion à réaction. Classique sur guitares et nappes. Plus d'étages = plus spatial.
+    </div>
 
-<p><b>Tremolo</b> — Modulation de volume. Paramètres : vitesse (Hz), profondeur.</p>
-<div class="audio-desc">🔊 2-4 Hz = pulsation douce. 10-20 Hz = mitraillette. Extrême = bourdonnement.</div>
+    <p><b>Tremolo</b> — Modulation de volume. Paramètres : vitesse (Hz), profondeur.</p>
+    <div class="audio-desc">🔊 2-4 Hz = pulsation douce. 10-20 Hz = mitraillette. Extrême = bourdonnement.</div>
 
-<p><b>Ring Mod</b> — Multiplication par sinusoïde. Paramètre : fréquence.</p>
-<div class="audio-desc">🔊 20-50 Hz = trémolo bourdonnant. 200-500 Hz = voix Dalek. 1000+ Hz = cristallin métallique.</div>
+    <p><b>Ring Mod</b> — Multiplication par sinusoïde. Paramètre : fréquence.</p>
+    <div class="audio-desc">🔊 20-50 Hz = trémolo bourdonnant. 200-500 Hz = voix Dalek. 1000+ Hz = cristallin
+        métallique.</div>
 
-<!-- ── Space & Texture ── -->
-<h3>🌌 Space &amp; Texture</h3>
+    <!-- ── Space & Texture ── -->
+    <h3>🌌 Space &amp; Texture</h3>
 
-<p><b>Delay</b> — Échos répétés. Paramètres : temps (ms), feedback, mix.</p>
-<div class="audio-desc">🔊 50-100ms = slapback de salle de bain. 300-500ms = échos rythmiques. Feedback haut = spirale infinie.</div>
+    <p><b>Delay</b> — Échos répétés. Paramètres : temps (ms), feedback, mix.</p>
+    <div class="audio-desc">🔊 50-100ms = slapback de salle de bain. 300-500ms = échos rythmiques. Feedback haut =
+        spirale infinie.</div>
 
-<p><b>Vinyl</b> — Imperfections vinyle. Paramètres : craquements, oscillation, bruit.</p>
-<div class="audio-desc">🔊 Léger = vieux tourne-disque chaleureux. Lourd = disque poussiéreux trouvé dans un grenier.</div>
+    <p><b>Vinyl</b> — Imperfections vinyle. Paramètres : craquements, oscillation, bruit.</p>
+    <div class="audio-desc">🔊 Léger = vieux tourne-disque chaleureux. Lourd = disque poussiéreux trouvé dans un
+        grenier.</div>
 
-<p><b>OTT</b> — Compression multibande. Paramètres : quantité, bandes.</p>
-<div class="audio-desc">🔊 Tout plus fort et percutant. Force max = hyper-compressé, style musique électronique.</div>
+    <p><b>OTT</b> — Compression multibande. Paramètres : quantité, bandes.</p>
+    <div class="audio-desc">🔊 Tout plus fort et percutant. Force max = hyper-compressé, style musique électronique.
+    </div>
 
-<p><b>Robotic Voice</b> — Transformation robotique. Paramètres : porteuse, formant.</p>
-<div class="audio-desc">🔊 Voix monotone métallique de robot. Instruments deviennent synthétiques.</div>
+    <p><b>Robotic Voice</b> — Transformation robotique. Paramètres : porteuse, formant.</p>
+    <div class="audio-desc">🔊 Voix monotone métallique de robot. Instruments deviennent synthétiques.</div>
 
-<p><b>Hyper</b> — Enhancement multibande. Paramètre : intensité.</p>
-<div class="audio-desc">🔊 Graves épais, médiums présents, aigus brillants. Haute intensité = inconfortablement vif.</div>
 
-<!-- ── Glitch ── -->
-<h3>⚡ Glitch</h3>
+    <!-- ── Glitch ── -->
+    <h3>⚡ Glitch</h3>
 
-<p><b>Stutter</b> — Répétition de fragments. Paramètres : taille (ms), répétitions.</p>
-<div class="audio-desc">🔊 10-50ms = patterns mitraillette. 100-200ms = beat-repeat musical. Classique du glitch.</div>
+    <p><b>Stutter</b> — Répétition de fragments. Paramètres : taille (ms), répétitions.</p>
+    <div class="audio-desc">🔊 10-50ms = patterns mitraillette. 100-200ms = beat-repeat musical. Classique du glitch.
+    </div>
 
-<p><b>Granular</b> — Décomposition en grains. Paramètres : taille, dispersion, randomisation.</p>
-<div class="audio-desc">🔊 Petits grains + dispersion = brume ambiante. Gros grains = son « gelé » ou « cristallisé ».</div>
+    <p><b>Granular</b> — Décomposition en grains. Paramètres : taille, dispersion, randomisation.</p>
+    <div class="audio-desc">🔊 Petits grains + dispersion = brume ambiante. Gros grains = son « gelé » ou « cristallisé
+        ».</div>
 
-<p><b>Shuffle</b> — Réarrangement de blocs. Paramètres : taille, aléatoire.</p>
-<div class="audio-desc">🔊 Petits blocs = chaos glitchy. Gros blocs = version surréaliste et mélangée.</div>
+    <p><b>Shuffle</b> — Réarrangement de blocs. Paramètres : taille, aléatoire.</p>
+    <div class="audio-desc">🔊 Petits blocs = chaos glitchy. Gros blocs = version surréaliste et mélangée.</div>
 
-<p><b>Buffer Freeze</b> — Boucle d'un fragment. Paramètres : taille, position.</p>
-<div class="audio-desc">🔊 5-20ms = bourdon tonal. 50-200ms = boucle reconnaissable du contenu.</div>
+    <p><b>Buffer Freeze</b> — Boucle d'un fragment. Paramètres : taille, position.</p>
+    <div class="audio-desc">🔊 5-20ms = bourdon tonal. 50-200ms = boucle reconnaissable du contenu.</div>
 
-<p><b>Datamosh</b> — Corruption des données. Paramètres : quantité, taille de bloc.</p>
-<div class="audio-desc">🔊 Léger = imperfections subtiles. Lourd = chaos de bruit numérique. Vraie destruction audio.</div>
+    <p><b>Datamosh</b> — Corruption des données. Paramètres : quantité, taille de bloc.</p>
+    <div class="audio-desc">🔊 Léger = imperfections subtiles. Lourd = chaos de bruit numérique. Vraie destruction
+        audio.</div>
 
-<p><b>Vocal Chop</b> — Découpe rythmique. Paramètres : pattern, gate.</p>
-<div class="audio-desc">🔊 Voix = vocal chop EDM classique. Instruments = gating rythmique.</div>
 
-<p><b>Tape Glitch</b> — Cassette endommagée. Paramètres : fréquence, sévérité.</p>
-<div class="audio-desc">🔊 Léger = caractère vintage. Lourd = la cassette se fait manger, l'audio bégaie et disparaît.</div>
+    <p><b>Tape Glitch</b> — Cassette endommagée. Paramètres : fréquence, sévérité.</p>
+    <div class="audio-desc">🔊 Léger = caractère vintage. Lourd = la cassette se fait manger, l'audio bégaie et
+        disparaît.</div>
 
-<!-- ═══════════════════════════════════ -->
-<h2>⭐ Favoris &amp; Presets</h2>
+    <!-- ═══════════════════════════════════ -->
+    <h2>⭐ Favoris &amp; Presets</h2>
 
-<p><b>Favoris</b> — Étoile à côté de chaque effet. Persistants entre sessions.</p>
+    <p><b>Favoris</b> — Étoile à côté de chaque effet. Persistants entre sessions.</p>
 
-<p><b>Vue Presets</b> — Onglet « PR ». Chaînes d'effets avec paramètres préconfigurés.</p>
+    <p><b>Vue Presets</b> — Onglet « PR ». Chaînes d'effets avec paramètres préconfigurés.</p>
 
-<p><b>Catalogue</b> — Descriptions de chaque effet.</p>
+    <p><b>Catalogue</b> — Descriptions de chaque effet.</p>
 
-<p><b>Import</b> — Import Effect Plugin (.py), Import Preset (.pspi), ou Aide (guide de création avec exemple de code).</p>
+    <p><b>Import</b> — Import Effect Plugin (.py), Import Preset (.pspi), ou Aide (guide de création avec exemple de
+        code).</p>
 
-<p><b>Export</b> — Exportez vos presets en .pspi à partager.</p>
+    <p><b>Export</b> — Exportez vos presets en .pspi à partager.</p>
 
-<p><b>New Preset</b> — Créez un preset : nom, description, tags, chaîne d'effets. Testez avec Play original / Play with preset.</p>
+    <p><b>New Preset</b> — Créez un preset : nom, description, tags, chaîne d'effets. Testez avec Play original / Play
+        with preset.</p>
 
-<p><b>Manage</b> — Éditez, supprimez vos presets. Gérez les tags. Presets intégrés en lecture seule.</p>
+    <p><b>Manage</b> — Éditez, supprimez vos presets. Gérez les tags. Presets intégrés en lecture seule.</p>
 
-<div class="tip">💡 Les fichiers .pspi sont du JSON. Partagez-les avec d'autres utilisateurs !</div>
+    <div class="tip">💡 Les fichiers .pspi sont du JSON. Partagez-les avec d'autres utilisateurs !</div>
 
-<!-- ═══════════════════════════════════ -->
-<h2>⚙️ Paramètres</h2>
+    <!-- ═══════════════════════════════════ -->
+    <h2>⚙️ Paramètres</h2>
 
-<p><b>Options &gt; Périphériques audio</b> — Sortie et entrée. Bouton Rafraîchir.</p>
-<p><b>Options &gt; Langue</b> — Anglais / Français. Mise à jour instantanée.</p>
-<p><b>Options &gt; Thème</b> — Sombre / Clair.</p>
-<p><b>Options &gt; Métronome</b> — BPM, volume, activation.</p>
+    <p><b>Options &gt; Périphériques audio</b> — Sortie et entrée. Bouton Rafraîchir.</p>
+    <p><b>Options &gt; Langue</b> — Anglais / Français. Mise à jour instantanée.</p>
+    <p><b>Options &gt; Thème</b> — Sombre / Clair.</p>
+    <p><b>Options &gt; Métronome</b> — BPM, volume, activation.</p>
 
-<!-- ═══════════════════════════════════ -->
-<h2>⌨️ Raccourcis clavier</h2>
+    <!-- ═══════════════════════════════════ -->
+    <h2>⌨️ Raccourcis clavier</h2>
 
-<table>
-<tr><th>Raccourci</th><th>Action</th></tr>
-<tr><td><kbd>Espace</kbd></td><td>Lecture / Pause</td></tr>
-<tr><td><kbd>Escape</kbd></td><td>Désélectionner</td></tr>
-<tr><td><kbd>Ctrl+Z</kbd></td><td>Annuler</td></tr>
-<tr><td><kbd>Ctrl+Y</kbd></td><td>Refaire</td></tr>
-<tr><td><kbd>M</kbd></td><td>Ajouter un marqueur</td></tr>
-<tr><td><kbd>Ctrl+→</kbd></td><td>Marqueur suivant</td></tr>
-<tr><td><kbd>Ctrl+←</kbd></td><td>Marqueur précédent</td></tr>
-<tr><td><kbd>Suppr</kbd></td><td>Supprimer le clip sélectionné</td></tr>
-<tr><td>Molette (waveform)</td><td>Zoom waveform</td></tr>
-<tr><td>Molette (timeline)</td><td>Zoom timeline</td></tr>
-</table>
+    <table>
+        <tr>
+            <th>Raccourci</th>
+            <th>Action</th>
+        </tr>
+        <tr>
+            <td><kbd>Espace</kbd></td>
+            <td>Lecture / Pause</td>
+        </tr>
+        <tr>
+            <td><kbd>Escape</kbd></td>
+            <td>Désélectionner</td>
+        </tr>
+        <tr>
+            <td><kbd>Ctrl+Z</kbd></td>
+            <td>Annuler</td>
+        </tr>
+        <tr>
+            <td><kbd>Ctrl+Y</kbd></td>
+            <td>Refaire</td>
+        </tr>
+        <tr>
+            <td><kbd>M</kbd></td>
+            <td>Ajouter un marqueur</td>
+        </tr>
+        <tr>
+            <td><kbd>Ctrl+→</kbd></td>
+            <td>Marqueur suivant</td>
+        </tr>
+        <tr>
+            <td><kbd>Ctrl+←</kbd></td>
+            <td>Marqueur précédent</td>
+        </tr>
+        <tr>
+            <td><kbd>Suppr</kbd></td>
+            <td>Supprimer le clip sélectionné</td>
+        </tr>
+        <tr>
+            <td>Molette (waveform)</td>
+            <td>Zoom waveform</td>
+        </tr>
+        <tr>
+            <td>Molette (timeline)</td>
+            <td>Zoom timeline</td>
+        </tr>
+    </table>
 
-<!-- ═══════════════════════════════════ -->
+    <!-- ═══════════════════════════════════ -->
 
-<p style="margin-top: 36px; color: #636e72; font-size: 12px; text-align: center;">
-Glitch Maker — Mattéo Dauriac (alias : Spiralyfox)<br>
-<a href="https://github.com/Spiralyfox/GlitchMaker">github.com/Spiralyfox/GlitchMaker</a>
-</p>
+    <p style="margin-top: 36px; color: #636e72; font-size: 12px; text-align: center;">
+        Glitch Maker — Mattéo Dauriac (alias : Spiralyfox)<br>
+        <a href="https://github.com/Spiralyfox/GlitchMaker">github.com/Spiralyfox/GlitchMaker</a>
+    </p>
 
 </body>
+
 </html>

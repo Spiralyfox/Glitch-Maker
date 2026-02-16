@@ -17,7 +17,7 @@ def save_project(filepath, timeline, sr, source_path="",
     _log.info("Saving project: %s", filepath)
     with zipfile.ZipFile(filepath, 'w', zipfile.ZIP_DEFLATED) as zf:
         meta = {
-            "version": "7.0",
+            "version": "8.1",
             "sample_rate": sr,
             "source_path": source_path,
             "clips": [],

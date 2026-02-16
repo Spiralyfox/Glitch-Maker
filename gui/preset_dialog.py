@@ -31,7 +31,6 @@ QListWidget::item:selected {{ background: {COLORS['accent']}; }}
 
 # ── Effect name → plugin ID mapping (all 28 effects) ──
 EFFECT_MAP = {
-    "Autotune": "autotune",
     "Bitcrusher": "bitcrusher",
     "Buffer Freeze": "buffer_freeze",
     "Chorus": "chorus",
@@ -40,7 +39,6 @@ EFFECT_MAP = {
     "Distortion": "distortion",
     "Filter": "filter",
     "Granular": "granular",
-    "Hyper": "hyper",
     "OTT": "ott",
     "Pan": "pan",
     "Phaser": "phaser",
@@ -57,7 +55,6 @@ EFFECT_MAP = {
     "Time Stretch": "time_stretch",
     "Tremolo": "tremolo",
     "Vinyl": "vinyl",
-    "Vocal Chop": "vocal_chop",
     "Volume": "volume",
 }
 EFFECT_NAMES = sorted(EFFECT_MAP.keys())
